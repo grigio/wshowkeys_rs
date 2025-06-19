@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use evdev::{Device, InputEvent};
 use log::{debug, error, info, warn};
-use serde::de;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -43,8 +42,12 @@ impl InputManager {
         debug!("InputManager::next_event() called, waiting for event from channel...");
         match self.event_receiver.recv().await {
             Some(event) => {
-                debug!("InputManager::next_event() received event: type={:?}, code={}, value={}", 
-                       event.event_type(), event.code(), event.value());
+                debug!(
+                    "InputManager received event from channel: type={:?}, code={}, value={}",
+                    event.event_type(),
+                    event.code(),
+                    event.value()
+                );
                 Ok(Some(event))
             }
             None => {
@@ -215,6 +218,9 @@ impl InputManager {
                 && keys.contains(evdev::Key::KEY_ENTER)
                 && keys.contains(evdev::Key::KEY_SPACE)
         }) {
+            // Set the device to non-blocking mode explicitly
+            // Note: evdev devices are typically non-blocking by default
+            debug!("Device {:?} is a keyboard device", path);
             Ok(Some(device))
         } else {
             Ok(None)
@@ -227,7 +233,7 @@ impl InputManager {
     ) {
         info!("Starting input event loop with {} devices", devices.len());
 
-        // Convert devices into individual async tasks
+        // Convert devices into individual tasks using standard blocking I/O
         let mut join_handles = Vec::new();
 
         for (path, mut device) in devices {
@@ -238,42 +244,66 @@ impl InputManager {
                 .unwrap_or("unknown")
                 .to_string();
 
-            let handle = tokio::spawn(async move {
+            let handle = tokio::task::spawn_blocking(move || {
                 info!("Starting event handler for device: {}", device_name);
 
+                let mut error_count = 0;
+
                 loop {
-                    // Poll the device for events in a non-blocking way
+                    // Try to read events from the device
                     match device.fetch_events() {
                         Ok(events) => {
-                            let events_vec: Vec<_> = events.collect();
-                            if !events_vec.is_empty() {
-                                for event in events_vec {
-                                    debug!(
-                                        "Raw input event from {}: type={:?}, code={}, value={}",
-                                        device_name,
-                                        event.event_type(),
-                                        event.code(),
-                                        event.value()
-                                    );
+                            error_count = 0; // Reset error count on successful read
 
-                                    if sender.send(event).is_err() {
+                            for event in events {
+                                debug!(
+                                    "Device {} received event: type={:?}, code={}, value={}",
+                                    device_name,
+                                    event.event_type(),
+                                    event.code(),
+                                    event.value()
+                                );
+
+                                match sender.send(event) {
+                                    Ok(()) => {
+                                        debug!(
+                                            "Device {} successfully sent event to channel",
+                                            device_name
+                                        );
+                                    }
+                                    Err(_) => {
                                         error!("Event receiver dropped for device {}", device_name);
                                         return;
-                                    } else {
-                                        debug!("Successfully sent event to channel from {}", device_name);
                                     }
                                 }
-                                // When we have events, check again quickly
-                                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-                            } else {
-                                // No events, sleep a bit longer to reduce CPU usage
-                                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
                             }
                         }
                         Err(e) => {
-                            error!("Error reading from device {}: {}", device_name, e);
-                            // Add backoff delay on error to avoid spinning
-                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                            match e.kind() {
+                                std::io::ErrorKind::WouldBlock => {
+                                    // No events available, this is normal for non-blocking devices
+                                    // Just sleep a bit and try again
+                                    std::thread::sleep(std::time::Duration::from_millis(10));
+                                }
+                                _ => {
+                                    error_count += 1;
+                                    error!(
+                                        "Error reading from device {} (error #{}): {}",
+                                        device_name, error_count, e
+                                    );
+
+                                    if error_count > 10 {
+                                        error!(
+                                            "Too many errors for device {}, stopping",
+                                            device_name
+                                        );
+                                        return;
+                                    }
+
+                                    // Sleep longer on other errors
+                                    std::thread::sleep(std::time::Duration::from_millis(100));
+                                }
+                            }
                         }
                     }
                 }
@@ -282,21 +312,17 @@ impl InputManager {
             join_handles.push(handle);
         }
 
-        info!("Started {} device tasks", join_handles.len());
+        info!("Started {} device event handlers", join_handles.len());
 
-        // Store the handles for cleanup, but don't wait for them here
-        // The tasks will run indefinitely and send events through the channel
-        tokio::spawn(async move {
-            // Monitor the tasks in the background
-            for handle in join_handles {
-                if let Err(e) = handle.await {
-                    error!("Device task failed: {}", e);
-                }
+        // Wait for all device tasks to complete
+        // This keeps the event_loop alive and maintains the channel
+        for handle in join_handles {
+            if let Err(e) = handle.await {
+                error!("Device task failed: {}", e);
             }
-            info!("All device event handlers stopped");
-        });
+        }
 
-        info!("Event loop setup complete - device tasks are running");
+        info!("All device event handlers stopped");
     }
 }
 

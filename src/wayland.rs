@@ -304,10 +304,18 @@ impl WaylandDisplay {
 
     /// Process Wayland events
     pub fn dispatch_events(&mut self) -> Result<()> {
-        self.queue
-            .blocking_dispatch(&mut *self.app_data.lock().unwrap())
-            .map_err(|e| anyhow!("Failed to dispatch events: {}", e))?;
-        Ok(())
+        // Use non-blocking dispatch to avoid hanging the async event loop
+        match self
+            .queue
+            .dispatch_pending(&mut *self.app_data.lock().unwrap())
+        {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // Only log the error, don't fail the entire loop
+                debug!("Wayland dispatch error (non-fatal): {}", e);
+                Ok(())
+            }
+        }
     }
 
     /// Convert our anchor position to Wayland anchor
