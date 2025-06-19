@@ -143,8 +143,8 @@ impl WaylandDisplay {
         }
 
         // Calculate actual display dimensions accounting for scaling
-        // Hyprland uses scaling, so we need to account for it
-        let scale_factor = 1.6; // Based on hyprctl output
+        // Temporarily disable scaling to debug the issue
+        let scale_factor = 1.0; // Changed from 1.6 for debugging
         let display_width = (rendered.width as f32 / scale_factor) as u32;
         let display_height = (rendered.height as f32 / scale_factor) as u32;
 
@@ -273,9 +273,9 @@ impl WaylandDisplay {
             "Display updated with {}x{} buffer (scaled from {}x{}) - RENDERED TEXT SHOULD BE VISIBLE",
             final_width, final_height, rendered.width, rendered.height
         );
-        
+
         println!(
-            "DEBUG: Buffer attached: {}x{} (original: {}x{}), scale_factor: {}", 
+            "DEBUG: Buffer attached: {}x{} (original: {}x{}), scale_factor: {}",
             final_width, final_height, rendered.width, rendered.height, scale_factor
         );
 
