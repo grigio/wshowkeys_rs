@@ -1,0 +1,44 @@
+[package]
+name = "wshowkeys_rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A Rust implementation of wshowkeys - displays keystrokes on screen for Wayland"
+license = "GPL-3.0"
+keywords = ["wayland", "keylogger", "display", "input"]
+categories = ["multimedia", "gui"]
+
+[dependencies]
+# Wayland client libraries
+smithay-client-toolkit = "0.19"
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "unstable"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+
+# Input handling
+evdev = "0.12"
+nix = { version = "0.29", features = ["process", "signal", "user"] }
+
+# Graphics and rendering
+cairo-rs = { version = "0.20", features = ["png"] }
+pango = "0.20"
+pangocairo = "0.20"
+
+# XKB for keyboard handling
+xkbcommon = "0.8"
+
+# Utilities
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.11"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+pkg-config = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
+mockall = "0.12"
