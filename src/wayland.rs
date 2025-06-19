@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use cairo;
 use log::{debug, info};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
@@ -137,7 +138,7 @@ impl WaylandDisplay {
         let mut data = self.app_data.lock().unwrap();
 
         if !data.configured {
-            debug!("Surface not yet configured, skipping update");
+            println!("Surface not yet configured, skipping update - waiting for compositor...");
             return Ok(());
         }
 
@@ -204,54 +205,60 @@ impl WaylandDisplay {
             (), // user data
         );
 
-        // Map memory and copy actual rendered content from Cairo
+        // Map memory and render directly using Cairo on the shared memory buffer
         let mut mmap = unsafe {
             memmap2::MmapMut::map_mut(&temp_file).map_err(|e| anyhow!("Failed to mmap: {}", e))?
         };
 
-        // For now, create a simple test pattern with background and some visible content
-        // This will be replaced with actual text rendering later
-        let dst_width = final_width as usize;
-        let dst_height = final_height as usize;
+        // Create a Cairo surface directly on the shared memory buffer
+        // This allows us to render directly without copying pixel data
+        let cairo_surface = unsafe {
+            cairo::ImageSurface::create_for_data_unsafe(
+                mmap.as_mut_ptr(),
+                cairo::Format::ARgb32,
+                final_width as i32,
+                final_height as i32,
+                (final_width * 4) as i32, // stride
+            )
+        }
+        .map_err(|e| anyhow!("Failed to create Cairo surface on shared memory: {}", e))?;
 
-        // Fill with background color first
+        let cairo_context = cairo::Context::new(&cairo_surface)
+            .map_err(|e| anyhow!("Failed to create Cairo context: {}", e))?;
+
+        // Clear the background first
         let bg_color = self.config.background_color;
-        let bg_r = ((bg_color >> 16) & 0xFF) as u8;
-        let bg_g = ((bg_color >> 8) & 0xFF) as u8;
-        let bg_b = (bg_color & 0xFF) as u8;
-        let bg_a = ((bg_color >> 24) & 0xFF) as u8;
+        let bg_r = ((bg_color >> 16) & 0xFF) as f64 / 255.0;
+        let bg_g = ((bg_color >> 8) & 0xFF) as f64 / 255.0;
+        let bg_b = (bg_color & 0xFF) as f64 / 255.0;
+        let bg_a = ((bg_color >> 24) & 0xFF) as f64 / 255.0;
 
-        for y in 0..dst_height {
-            for x in 0..dst_width {
-                let offset = (y * dst_width + x) * 4;
-                if offset + 3 < mmap.len() {
-                    mmap[offset] = bg_b; // Blue
-                    mmap[offset + 1] = bg_g; // Green
-                    mmap[offset + 2] = bg_r; // Red
-                    mmap[offset + 3] = bg_a; // Alpha
-                }
-            }
-        }
+        cairo_context.set_source_rgba(bg_r, bg_g, bg_b, bg_a);
+        cairo_context
+            .paint()
+            .map_err(|e| anyhow!("Failed to paint background: {}", e))?;
 
-        // Add a simple colored border to make it visible for now
-        let border_size = 2;
-        for y in 0..dst_height {
-            for x in 0..dst_width {
-                if x < border_size
-                    || x >= dst_width - border_size
-                    || y < border_size
-                    || y >= dst_height - border_size
-                {
-                    let offset = (y * dst_width + x) * 4;
-                    if offset + 3 < mmap.len() {
-                        mmap[offset] = 0x00; // Blue
-                        mmap[offset + 1] = 0xFF; // Green
-                        mmap[offset + 2] = 0x00; // Red
-                        mmap[offset + 3] = 0xFF; // Alpha - green border
-                    }
-                }
-            }
-        }
+        // Now render the actual text by drawing the original Cairo surface onto our buffer
+        // We need to scale it appropriately
+        let scale_x = final_width as f64 / rendered.width as f64;
+        let scale_y = final_height as f64 / rendered.height as f64;
+
+        cairo_context
+            .save()
+            .map_err(|e| anyhow!("Failed to save context: {}", e))?;
+        cairo_context.scale(scale_x, scale_y);
+        cairo_context
+            .set_source_surface(&rendered.surface, 0.0, 0.0)
+            .map_err(|e| anyhow!("Failed to set source surface: {}", e))?;
+        cairo_context
+            .paint()
+            .map_err(|e| anyhow!("Failed to paint rendered surface: {}", e))?;
+        cairo_context
+            .restore()
+            .map_err(|e| anyhow!("Failed to restore context: {}", e))?;
+
+        // Ensure all drawing operations are complete
+        cairo_surface.flush();
 
         // Ensure data is written
         mmap.flush()
@@ -263,12 +270,23 @@ impl WaylandDisplay {
         surface.commit();
 
         info!(
-            "Display updated with {}x{} buffer (scaled from {}x{}) - SHOULD BE VISIBLE AS YELLOW RECTANGLE",
+            "Display updated with {}x{} buffer (scaled from {}x{}) - RENDERED TEXT SHOULD BE VISIBLE",
             final_width, final_height, rendered.width, rendered.height
+        );
+        
+        println!(
+            "DEBUG: Buffer attached: {}x{} (original: {}x{}), scale_factor: {}", 
+            final_width, final_height, rendered.width, rendered.height, scale_factor
         );
 
         drop(data);
         Ok(())
+    }
+
+    /// Check if the surface is configured and ready for display
+    pub fn is_configured(&self) -> bool {
+        let data = self.app_data.lock().unwrap();
+        data.configured
     }
 
     /// Hide the display (clear content)

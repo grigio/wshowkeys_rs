@@ -54,19 +54,39 @@ fn main() -> Result<()> {
     wayland_display.initialize()?;
     println!("Wayland display initialized successfully!");
 
+    // Wait for the surface to be configured by the compositor
+    println!("Waiting for surface configuration...");
+    let mut attempts = 0;
+    while attempts < 20 && !wayland_display.is_configured() {
+        if let Err(_) = wayland_display.dispatch_events() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+        attempts += 1;
+    }
+
+    if wayland_display.is_configured() {
+        println!("Surface configuration completed!");
+    } else {
+        println!("Warning: Surface may not be fully configured yet");
+    }
+
     // Test 1: Display single key
     println!("Displaying single key 'a'...");
     let single_key = vec![create_test_keypress(Key::KEY_A, "a", false)];
     let single_result = renderer.render_keypresses_colored(&single_key)?;
+    println!("Rendered size: {}x{}, attempting to display...", single_result.width, single_result.height);
     wayland_display.update_display(&single_result)?;
     println!(
         "Single key displayed: {}x{}",
         single_result.width, single_result.height
     );
 
+    println!("Waiting 2 seconds for 'a' to be visible...");
     // Wait and process events
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_secs(2));
     let _ = wayland_display.dispatch_events();
+    println!("First test completed, moving to next test...");
 
     // Test 2: Display key combination
     println!("Displaying key combination 'Ctrl+a'...");
