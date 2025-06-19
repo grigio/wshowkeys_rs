@@ -96,7 +96,8 @@ impl KeyBuffer {
     }
 
     pub fn get_display_text(&self) -> String {
-        let text = self.keys
+        let text = self
+            .keys
             .iter()
             .map(|k| k.display_name.as_str())
             .collect::<Vec<_>>()
@@ -295,9 +296,13 @@ impl KeyBuffer {
 }
 
 pub fn process_input_event(event: InputEvent) -> Result<Option<Keypress>> {
-    debug!("Processing input event: type={:?}, code={}, value={}", 
-           event.event_type(), event.code(), event.value());
-           
+    debug!(
+        "Processing input event: type={:?}, code={}, value={}",
+        event.event_type(),
+        event.code(),
+        event.value()
+    );
+
     if event.event_type() != EventType::KEY {
         debug!("Ignoring non-key event: {:?}", event.event_type());
         return Ok(None);
@@ -317,9 +322,13 @@ pub fn process_input_event(event: InputEvent) -> Result<Option<Keypress>> {
     // For now, create a simplified keypress without XKB context
     // In a full implementation, we'd use XKB to get proper keysym and UTF-8
     let display_name = format!("{:?}", key).replace("KEY_", "");
-    
-    debug!("Creating keypress: key={:?}, display_name='{}', is_special={}", 
-           key, display_name, is_special_key(key));
+
+    debug!(
+        "Creating keypress: key={:?}, display_name='{}', is_special={}",
+        key,
+        display_name,
+        is_special_key(key)
+    );
 
     Ok(Some(Keypress {
         key,

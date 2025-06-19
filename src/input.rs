@@ -40,7 +40,18 @@ impl InputManager {
     }
 
     pub async fn next_event(&mut self) -> Result<Option<InputEvent>> {
-        Ok(self.event_receiver.recv().await)
+        debug!("InputManager::next_event() called, waiting for event from channel...");
+        match self.event_receiver.recv().await {
+            Some(event) => {
+                debug!("InputManager::next_event() received event: type={:?}, code={}, value={}", 
+                       event.event_type(), event.code(), event.value());
+                Ok(Some(event))
+            }
+            None => {
+                warn!("Input event channel closed");
+                Ok(None)
+            }
+        }
     }
 
     fn check_permissions() -> Result<()> {
@@ -248,6 +259,8 @@ impl InputManager {
                                     if sender.send(event).is_err() {
                                         error!("Event receiver dropped for device {}", device_name);
                                         return;
+                                    } else {
+                                        debug!("Successfully sent event to channel from {}", device_name);
                                     }
                                 }
                                 // When we have events, check again quickly

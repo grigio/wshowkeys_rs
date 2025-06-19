@@ -59,15 +59,22 @@ async fn run_main_loop(
     let mut key_buffer = keypress::KeyBuffer::new(config.timeout, config.length_limit);
 
     loop {
+        debug!("Main event loop iteration starting...");
         tokio::select! {
             // Handle input events
             input_event = input_manager.next_event() => {
+                debug!("Selected INPUT branch - Received input_event result from InputManager");
                 match input_event {
                     Ok(Some(event)) => {
+                        debug!("Received event: type={:?}, code={}, value={}", 
+                               event.event_type(), event.code(), event.value());
                         if let Some(keypress) = keypress::process_input_event(event)? {
                             debug!("Adding keypress to buffer: '{}'", keypress.display_name);
                             key_buffer.add_keypress(keypress);
                             wayland_client.update_display(&key_buffer, &config).await?;
+                        } else {
+                            debug!("process_input_event returned None for event: type={:?}, code={}, value={}", 
+                                   event.event_type(), event.code(), event.value());
                         }
                     }
                     Ok(None) => {
@@ -83,6 +90,7 @@ async fn run_main_loop(
 
             // Handle wayland events
             wayland_event = wayland_client.next_event() => {
+                debug!("Selected WAYLAND branch - Received wayland_event result from WaylandClient");
                 match wayland_event {
                     Ok(should_continue) => {
                         if !should_continue {
@@ -98,6 +106,7 @@ async fn run_main_loop(
 
             // Handle timeout for clearing old keys
             _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
+                debug!("Selected TIMEOUT branch - Checking for expired keys");
                 if key_buffer.cleanup_expired() {
                     wayland_client.update_display(&key_buffer, &config).await?;
                 }

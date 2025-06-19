@@ -16,8 +16,8 @@ use smithay_client_toolkit::{
 };
 use wayland_client::{
     globals::registry_queue_init,
-    protocol::{wl_compositor, wl_output, wl_shm, wl_surface},
-    Connection, QueueHandle,
+    protocol::{wl_output, wl_surface},
+    Connection, EventQueue, QueueHandle,
 };
 use wayland_protocols_wlr::layer_shell::v1::client::{
     zwlr_layer_shell_v1, zwlr_layer_surface_v1,
@@ -27,6 +27,7 @@ use crate::{config::Config, keypress::KeyBuffer, renderer::Renderer};
 
 pub struct WaylandClient {
     connection: Connection,
+    event_queue: EventQueue<AppData>,
     queue_handle: QueueHandle<AppData>,
     app_data: AppData,
 }
@@ -107,8 +108,9 @@ impl WaylandClient {
         event_queue.blocking_dispatch(&mut app_data)
             .map_err(|e| anyhow!("Failed to dispatch initial events: {}", e))?;
 
-        let mut client = WaylandClient {
+        let client = WaylandClient {
             connection,
+            event_queue,
             queue_handle,
             app_data,
         };
@@ -118,9 +120,12 @@ impl WaylandClient {
     }
 
     pub async fn next_event(&mut self) -> Result<bool> {
-        let mut event_queue = self.connection.new_event_queue();
-        match event_queue.blocking_dispatch(&mut self.app_data) {
-            Ok(_) => Ok(true),
+        debug!("WaylandClient::next_event() called - using non-blocking dispatch");
+        match self.event_queue.dispatch_pending(&mut self.app_data) {
+            Ok(_) => {
+                debug!("WaylandClient::next_event() - dispatch_pending completed successfully");
+                Ok(true)
+            }
             Err(e) => {
                 error!("Wayland event error: {}", e);
                 Ok(false)
