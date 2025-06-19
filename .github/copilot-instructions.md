@@ -4,19 +4,6 @@
 
 This is a Rust implementation of wshowkeys - a Wayland application that displays keystrokes on screen in real-time.
 
-## Project Context
-
-- **Purpose**: Display keyboard input overlay on Wayland compositors
-- **Original**: Based on the C implementation at https://github.com/DreamMaoMao/wshowkeys
-- **Key Technologies**: Wayland protocols (wlr-layer-shell), evdev input handling, Cairo/Pango rendering
-
-## Architecture Guidelines
-
-1. **Input Handling**: Use evdev to capture keyboard events with proper privilege handling
-2. **Wayland Integration**: Implement wlr-layer-shell protocol for overlay display
-3. **Rendering**: Use Cairo/Pango for text rendering with customizable fonts and colors
-4. **Security**: Handle root privilege requirements safely (setuid or capabilities)
-
 ## Code Style
 
 - Follow Rust conventions and idioms
