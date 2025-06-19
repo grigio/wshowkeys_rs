@@ -26,21 +26,13 @@ impl InputManager {
 
         info!("Found {} input devices", devices.len());
 
-        // Clone the device paths for the background task
-        let device_paths: Vec<PathBuf> = devices.keys().cloned().collect();
+        // Pass the actual devices to the background task instead of reopening them
         let event_task = tokio::spawn(async move {
-            // Reopen devices in the background task
-            let mut task_devices = HashMap::new();
-            for path in device_paths {
-                if let Ok(Some(device)) = Self::try_open_device(&path).await {
-                    task_devices.insert(path, device);
-                }
-            }
-            Self::event_loop(task_devices, event_sender).await;
+            Self::event_loop(devices, event_sender).await;
         });
 
         Ok(InputManager {
-            devices,
+            devices: HashMap::new(), // Empty since devices are moved to background task
             event_receiver,
             _event_task: event_task,
         })
@@ -221,40 +213,47 @@ impl InputManager {
         mut devices: HashMap<PathBuf, Device>,
         event_sender: mpsc::UnboundedSender<InputEvent>,
     ) {
-        info!("Starting input event loop");
+        info!("Starting input event loop with {} devices", devices.len());
 
         loop {
-            // Use a more sophisticated approach with select! for multiple devices
             let mut any_events = false;
 
+            // Process events from all devices
             for (path, device) in devices.iter_mut() {
                 match device.fetch_events() {
                     Ok(events) => {
-                        for event in events {
+                        let events_vec: Vec<_> = events.collect();
+                        if !events_vec.is_empty() {
                             any_events = true;
-                            debug!("Raw input event from {:?}: type={:?}, code={}, value={}", 
-                                   path.file_name().unwrap_or_default(), 
-                                   event.event_type(), 
-                                   event.code(), 
-                                   event.value());
-                            if event_sender.send(event).is_err() {
-                                error!("Event receiver has been dropped, stopping event loop");
-                                return;
+                            for event in events_vec {
+                                debug!("Raw input event from {:?}: type={:?}, code={}, value={}", 
+                                       path.file_name().unwrap_or_default(), 
+                                       event.event_type(), 
+                                       event.code(), 
+                                       event.value());
+                                if event_sender.send(event).is_err() {
+                                    error!("Event receiver has been dropped, stopping event loop");
+                                    return;
+                                }
                             }
                         }
                     }
                     Err(e) => {
                         error!("Error reading from device {:?}: {}", path, e);
-                        // Remove the problematic device
+                        // Continue with other devices instead of breaking
                         continue;
                     }
                 }
             }
 
-            if !any_events {
-                // Sleep briefly to avoid busy waiting
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-            }
+            // Use shorter sleep when events are active, longer when idle
+            let sleep_duration = if any_events {
+                std::time::Duration::from_millis(1) // Very responsive when active
+            } else {
+                std::time::Duration::from_millis(5) // Reduce CPU when idle
+            };
+            
+            tokio::time::sleep(sleep_duration).await;
         }
     }
 }
