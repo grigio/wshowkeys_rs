@@ -210,51 +210,74 @@ impl InputManager {
     }
 
     async fn event_loop(
-        mut devices: HashMap<PathBuf, Device>,
+        devices: HashMap<PathBuf, Device>,
         event_sender: mpsc::UnboundedSender<InputEvent>,
     ) {
         info!("Starting input event loop with {} devices", devices.len());
 
-        loop {
-            let mut any_events = false;
+        // Convert devices into individual async tasks
+        let mut join_handles = Vec::new();
 
-            // Process events from all devices
-            for (path, device) in devices.iter_mut() {
-                match device.fetch_events() {
-                    Ok(events) => {
-                        let events_vec: Vec<_> = events.collect();
-                        if !events_vec.is_empty() {
-                            any_events = true;
-                            for event in events_vec {
-                                debug!("Raw input event from {:?}: type={:?}, code={}, value={}", 
-                                       path.file_name().unwrap_or_default(), 
-                                       event.event_type(), 
-                                       event.code(), 
-                                       event.value());
-                                if event_sender.send(event).is_err() {
-                                    error!("Event receiver has been dropped, stopping event loop");
-                                    return;
+        for (path, mut device) in devices {
+            let sender = event_sender.clone();
+            let device_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            let handle = tokio::spawn(async move {
+                info!("Starting event handler for device: {}", device_name);
+
+                loop {
+                    // Poll the device for events in a non-blocking way
+                    match device.fetch_events() {
+                        Ok(events) => {
+                            let events_vec: Vec<_> = events.collect();
+                            if !events_vec.is_empty() {
+                                for event in events_vec {
+                                    debug!(
+                                        "Raw input event from {}: type={:?}, code={}, value={}",
+                                        device_name,
+                                        event.event_type(),
+                                        event.code(),
+                                        event.value()
+                                    );
+
+                                    if sender.send(event).is_err() {
+                                        error!("Event receiver dropped for device {}", device_name);
+                                        return;
+                                    }
                                 }
+                                // When we have events, check again quickly
+                                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                            } else {
+                                // No events, sleep a bit longer to reduce CPU usage
+                                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
                             }
                         }
-                    }
-                    Err(e) => {
-                        error!("Error reading from device {:?}: {}", path, e);
-                        // Continue with other devices instead of breaking
-                        continue;
+                        Err(e) => {
+                            error!("Error reading from device {}: {}", device_name, e);
+                            // Add backoff delay on error to avoid spinning
+                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        }
                     }
                 }
-            }
+            });
 
-            // Use shorter sleep when events are active, longer when idle
-            let sleep_duration = if any_events {
-                std::time::Duration::from_millis(1) // Very responsive when active
-            } else {
-                std::time::Duration::from_millis(5) // Reduce CPU when idle
-            };
-            
-            tokio::time::sleep(sleep_duration).await;
+            join_handles.push(handle);
         }
+
+        info!("Started {} device tasks", join_handles.len());
+
+        // Wait for all device tasks to complete (they should run indefinitely)
+        for handle in join_handles {
+            if let Err(e) = handle.await {
+                error!("Device task failed: {}", e);
+            }
+        }
+
+        info!("All device event handlers stopped");
     }
 }
 
