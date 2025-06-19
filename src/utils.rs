@@ -6,20 +6,20 @@ use std::fs;
 pub fn drop_privileges() -> Result<()> {
     let uid = nix::unistd::getuid();
     let gid = nix::unistd::getgid();
-    
+
     if nix::unistd::geteuid().is_root() {
         // Drop to the real user's privileges
         nix::unistd::setgid(gid)?;
         nix::unistd::setuid(uid)?;
-        
+
         // Verify we can't regain root
         if nix::unistd::setuid(nix::unistd::Uid::from_raw(0)).is_ok() {
             return Err(anyhow::anyhow!("Failed to properly drop root privileges"));
         }
-        
+
         log::info!("Successfully dropped root privileges");
     }
-    
+
     Ok(())
 }
 
@@ -40,27 +40,39 @@ pub fn check_setuid() -> bool {
 
 /// Print helpful error messages for privilege issues
 pub fn print_privilege_help() {
-    eprintln!("wshowkeys_rs requires root privileges to access input devices.");
+    eprintln!("wshowkeys_rs needs access to input devices to capture keystrokes.");
     eprintln!();
-    eprintln!("You have several options:");
-    eprintln!("  1. Run with sudo:");
+    eprintln!("RECOMMENDED (most secure) options:");
+    eprintln!();
+    eprintln!("  1. Add yourself to the 'input' group (RECOMMENDED):");
+    eprintln!("     sudo usermod -a -G input $USER");
+    eprintln!("     sudo udevadm control --reload-rules && sudo udevadm trigger");
+    eprintln!("     # Then log out and back in for changes to take effect");
+    eprintln!();
+    eprintln!("  2. Use capabilities instead of setuid (if supported):");
+    eprintln!("     sudo setcap cap_dac_override=ep $(which wshowkeys_rs)");
+    eprintln!();
+    eprintln!("  3. Create a udev rule for specific access:");
+    eprintln!("     echo 'KERNEL==\"event*\", GROUP=\"input\", MODE=\"0640\"' | sudo tee /etc/udev/rules.d/99-input-devices.rules");
+    eprintln!("     sudo udevadm control --reload-rules && sudo udevadm trigger");
+    eprintln!();
+    eprintln!("LESS SECURE options (use only if above don't work):");
+    eprintln!();
+    eprintln!("  4. Run with sudo (temporary solution):");
     eprintln!("     sudo wshowkeys_rs");
     eprintln!();
-    eprintln!("  2. Set the setuid bit (recommended):");
-    eprintln!("     sudo chown root:root /path/to/wshowkeys_rs");
-    eprintln!("     sudo chmod u+s /path/to/wshowkeys_rs");
+    eprintln!("  5. Set setuid bit (NOT RECOMMENDED - security risk):");
+    eprintln!("     sudo chown root:root $(which wshowkeys_rs)");
+    eprintln!("     sudo chmod u+s $(which wshowkeys_rs)");
     eprintln!();
-    eprintln!("  3. Add yourself to the input group and set appropriate permissions:");
-    eprintln!("     sudo usermod -a -G input $USER");
-    eprintln!("     sudo udevadm control --reload-rules");
-    eprintln!("     # Then log out and back in");
+    eprintln!("Note: After using option 1 or 3, you may need to reboot or restart your session.");
 }
 
 /// Format a duration in a human-readable way
 pub fn format_duration(duration: std::time::Duration) -> String {
     let secs = duration.as_secs();
     let ms = duration.subsec_millis();
-    
+
     if secs > 0 {
         format!("{}.{:03}s", secs, ms)
     } else {
@@ -86,26 +98,26 @@ mod tests {
         // Test milliseconds only
         let dur = Duration::from_millis(500);
         assert_eq!(format_duration(dur), "500ms");
-        
+
         let dur = Duration::from_millis(100);
         assert_eq!(format_duration(dur), "100ms");
-        
+
         let dur = Duration::from_millis(1);
         assert_eq!(format_duration(dur), "1ms");
-        
+
         let dur = Duration::from_millis(999);
         assert_eq!(format_duration(dur), "999ms");
-        
+
         // Test seconds with milliseconds
         let dur = Duration::from_millis(1500);
         assert_eq!(format_duration(dur), "1.500s");
-        
+
         let dur = Duration::from_millis(2000);
         assert_eq!(format_duration(dur), "2.000s");
-        
+
         let dur = Duration::from_millis(10123);
         assert_eq!(format_duration(dur), "10.123s");
-        
+
         // Test zero duration
         let dur = Duration::from_millis(0);
         assert_eq!(format_duration(dur), "0ms");
@@ -123,7 +135,7 @@ mod tests {
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_COMMA), "COMMA");
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_DOT), "DOT");
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_SLASH), "SLASH");
-        
+
         // Test that the prefix "KEY_" is removed
         let key_debug = format!("{:?}", evdev::Key::KEY_A);
         assert!(key_debug.starts_with("KEY_"));
@@ -138,7 +150,7 @@ mod tests {
         assert!(result == true || result == false); // Just verify it returns a boolean
     }
 
-    #[test] 
+    #[test]
     fn test_print_privilege_help() {
         // This function just prints to stderr, so we can only test that it doesn't panic
         print_privilege_help();
@@ -160,15 +172,15 @@ mod tests {
         // Test very small durations
         let dur = Duration::from_nanos(1);
         assert_eq!(format_duration(dur), "0ms");
-        
+
         let dur = Duration::from_micros(1);
         assert_eq!(format_duration(dur), "0ms");
-        
+
         // Test large durations
         let dur = Duration::from_secs(3600); // 1 hour
         assert_eq!(format_duration(dur), "3600.000s");
-        
-        let dur = Duration::from_secs(86400); // 1 day  
+
+        let dur = Duration::from_secs(86400); // 1 day
         assert_eq!(format_duration(dur), "86400.000s");
     }
 
@@ -181,7 +193,10 @@ mod tests {
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_TAB), "TAB");
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_CAPSLOCK), "CAPSLOCK");
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_LEFTSHIFT), "LEFTSHIFT");
-        assert_eq!(evdev_key_to_string(evdev::Key::KEY_RIGHTSHIFT), "RIGHTSHIFT");
+        assert_eq!(
+            evdev_key_to_string(evdev::Key::KEY_RIGHTSHIFT),
+            "RIGHTSHIFT"
+        );
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_LEFTALT), "LEFTALT");
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_RIGHTALT), "RIGHTALT");
         assert_eq!(evdev_key_to_string(evdev::Key::KEY_LEFTMETA), "LEFTMETA");

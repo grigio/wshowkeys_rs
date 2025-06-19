@@ -1601,6 +1601,7 @@ dependencies = [
  "clap",
  "env_logger",
  "evdev",
+ "libc",
  "log",
  "mockall",
  "nix 0.29.0",

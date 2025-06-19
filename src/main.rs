@@ -30,19 +30,18 @@ async fn main() -> Result<()> {
 
     info!("Starting wshowkeys_rs v{}", env!("CARGO_PKG_VERSION"));
 
-    // Check for root privileges early
-    if !nix::unistd::geteuid().is_root() {
-        error!("wshowkeys_rs needs to be setuid to read input events");
-        error!("Please run: sudo chmod u+s /path/to/wshowkeys_rs");
-        std::process::exit(1);
-    }
-
     // Parse configuration
     let config = Config::from_args(args)?;
     debug!("Configuration: {:#?}", config);
 
-    // Initialize components
-    let input_manager = InputManager::new(config.device_path.clone()).await?;
+    // Initialize components - InputManager will handle permission checking
+    let input_manager = match InputManager::new(config.device_path.clone()).await {
+        Ok(manager) => manager,
+        Err(e) => {
+            error!("{}", e);
+            std::process::exit(1);
+        }
+    };
     let wayland_client = WaylandClient::new(&config).await?;
 
     // Main event loop
