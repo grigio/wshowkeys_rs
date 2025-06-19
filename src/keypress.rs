@@ -1,5 +1,6 @@
 use anyhow::Result;
 use evdev::{EventType, InputEvent, Key};
+use log::debug;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 use xkbcommon::xkb;
@@ -95,11 +96,13 @@ impl KeyBuffer {
     }
 
     pub fn get_display_text(&self) -> String {
-        self.keys
+        let text = self.keys
             .iter()
             .map(|k| k.display_name.as_str())
             .collect::<Vec<_>>()
-            .join("")
+            .join("");
+        debug!("Current display text: '{}'", text);
+        text
     }
 
     pub fn is_empty(&self) -> bool {
@@ -292,7 +295,11 @@ impl KeyBuffer {
 }
 
 pub fn process_input_event(event: InputEvent) -> Result<Option<Keypress>> {
+    debug!("Processing input event: type={:?}, code={}, value={}", 
+           event.event_type(), event.code(), event.value());
+           
     if event.event_type() != EventType::KEY {
+        debug!("Ignoring non-key event: {:?}", event.event_type());
         return Ok(None);
     }
 
@@ -300,6 +307,7 @@ pub fn process_input_event(event: InputEvent) -> Result<Option<Keypress>> {
     if key_event != 1 {
         // 1 = pressed, 0 = released
         // Only handle key press events for display
+        debug!("Ignoring key event (not press): value={}", key_event);
         return Ok(None);
     }
 
@@ -309,6 +317,9 @@ pub fn process_input_event(event: InputEvent) -> Result<Option<Keypress>> {
     // For now, create a simplified keypress without XKB context
     // In a full implementation, we'd use XKB to get proper keysym and UTF-8
     let display_name = format!("{:?}", key).replace("KEY_", "");
+    
+    debug!("Creating keypress: key={:?}, display_name='{}', is_special={}", 
+           key, display_name, is_special_key(key));
 
     Ok(Some(Keypress {
         key,

@@ -65,6 +65,7 @@ async fn run_main_loop(
                 match input_event {
                     Ok(Some(event)) => {
                         if let Some(keypress) = keypress::process_input_event(event)? {
+                            debug!("Adding keypress to buffer: '{}'", keypress.display_name);
                             key_buffer.add_keypress(keypress);
                             wayland_client.update_display(&key_buffer, &config).await?;
                         }

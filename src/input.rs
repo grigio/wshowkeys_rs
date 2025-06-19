@@ -232,6 +232,11 @@ impl InputManager {
                     Ok(events) => {
                         for event in events {
                             any_events = true;
+                            debug!("Raw input event from {:?}: type={:?}, code={}, value={}", 
+                                   path.file_name().unwrap_or_default(), 
+                                   event.event_type(), 
+                                   event.code(), 
+                                   event.value());
                             if event_sender.send(event).is_err() {
                                 error!("Event receiver has been dropped, stopping event loop");
                                 return;
