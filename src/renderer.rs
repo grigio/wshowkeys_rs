@@ -84,9 +84,9 @@ impl TextRenderer {
         let mut buffer = Vec::new();
         surface.write_to_png(&mut Cursor::new(&mut buffer))?;
 
-        // For now, create empty raw data to avoid Cairo access issues
+        // For now, avoid Cairo data access and create simple placeholder data
         let stride = surface.stride();
-        let data = vec![0u8; (surface.width() * surface.height() * 4) as usize];
+        let data = vec![0u8; (surface_width * surface_height * 4) as usize];
 
         Ok(RenderedSurface {
             surface,
@@ -177,9 +177,9 @@ impl TextRenderer {
         let mut buffer = Vec::new();
         surface.write_to_png(&mut Cursor::new(&mut buffer))?;
 
-        // For now, create empty raw data to avoid Cairo access issues
+        // For now, avoid Cairo data access and create simple placeholder data
         let stride = surface.stride();
-        let data = vec![0u8; (surface.width() * surface.height() * 4) as usize];
+        let data = vec![0u8; (surface_width * surface_height * 4) as usize];
 
         Ok(RenderedSurface {
             surface,

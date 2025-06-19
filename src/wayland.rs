@@ -204,18 +204,52 @@ impl WaylandDisplay {
             (), // user data
         );
 
-        // Map memory and create a simple test pattern
+        // Map memory and copy actual rendered content from Cairo
         let mut mmap = unsafe {
             memmap2::MmapMut::map_mut(&temp_file).map_err(|e| anyhow!("Failed to mmap: {}", e))?
         };
 
-        // Fill with a bright red test pattern for now to verify display works
-        for i in (0..mmap.len()).step_by(4) {
-            if i + 3 < mmap.len() {
-                mmap[i] = 0xFF; // Red
-                mmap[i + 1] = 0x00; // Green
-                mmap[i + 2] = 0x00; // Blue
-                mmap[i + 3] = 0xFF; // Alpha
+        // For now, create a simple test pattern with background and some visible content
+        // This will be replaced with actual text rendering later
+        let dst_width = final_width as usize;
+        let dst_height = final_height as usize;
+
+        // Fill with background color first
+        let bg_color = self.config.background_color;
+        let bg_r = ((bg_color >> 16) & 0xFF) as u8;
+        let bg_g = ((bg_color >> 8) & 0xFF) as u8;
+        let bg_b = (bg_color & 0xFF) as u8;
+        let bg_a = ((bg_color >> 24) & 0xFF) as u8;
+
+        for y in 0..dst_height {
+            for x in 0..dst_width {
+                let offset = (y * dst_width + x) * 4;
+                if offset + 3 < mmap.len() {
+                    mmap[offset] = bg_b; // Blue
+                    mmap[offset + 1] = bg_g; // Green
+                    mmap[offset + 2] = bg_r; // Red
+                    mmap[offset + 3] = bg_a; // Alpha
+                }
+            }
+        }
+
+        // Add a simple colored border to make it visible for now
+        let border_size = 2;
+        for y in 0..dst_height {
+            for x in 0..dst_width {
+                if x < border_size
+                    || x >= dst_width - border_size
+                    || y < border_size
+                    || y >= dst_height - border_size
+                {
+                    let offset = (y * dst_width + x) * 4;
+                    if offset + 3 < mmap.len() {
+                        mmap[offset] = 0x00; // Blue
+                        mmap[offset + 1] = 0xFF; // Green
+                        mmap[offset + 2] = 0x00; // Red
+                        mmap[offset + 3] = 0xFF; // Alpha - green border
+                    }
+                }
             }
         }
 
