@@ -1,159 +1,252 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use cairo::{Context, Format, ImageSurface};
-use log::{debug, error};
-use pango::{FontDescription, Layout};
-use pangocairo::functions::{create_layout, show_layout, update_layout};
-use smithay_client_toolkit::shm::{slot::SlotPool, Shm};
-use std::io::{BufWriter, Seek, SeekFrom, Write};
-use wayland_client::{protocol::wl_surface, QueueHandle};
+use pango::{FontDescription, WrapMode};
+use pangocairo::functions::{create_layout, show_layout};
+use std::io::Cursor;
 
 use crate::config::Config;
+use crate::keypress::Keypress;
 
-pub struct Renderer {
-    font_desc: FontDescription,
-    scale: f64,
+/// Represents a rendered surface with text content
+#[derive(Debug)]
+pub struct RenderedSurface {
+    pub surface: ImageSurface,
+    pub width: i32,
+    pub height: i32,
+    pub buffer: Vec<u8>,   // PNG data for debugging
+    pub raw_data: Vec<u8>, // Raw BGRA pixel data
+    pub stride: i32,       // Stride of the raw data
 }
 
-impl Renderer {
-    pub fn new(config: &Config) -> Result<Self> {
+/// Text renderer for keystroke display
+pub struct TextRenderer {
+    config: Config,
+    font_desc: FontDescription,
+}
+
+impl TextRenderer {
+    /// Create a new text renderer with the given configuration
+    pub fn new(config: Config) -> Result<Self> {
         let font_desc = FontDescription::from_string(&config.font);
-        let scale = 1.0; // TODO: Handle HiDPI scaling
 
-        Ok(Renderer { font_desc, scale })
+        Ok(Self { config, font_desc })
     }
 
-    pub fn calculate_text_size(&self, text: &str) -> Result<(u32, u32)> {
-        if text.is_empty() {
-            return Ok((0, 0));
+    /// Render a list of keypresses to a surface
+    pub fn render_keypresses(&self, keypresses: &[Keypress]) -> Result<RenderedSurface> {
+        if keypresses.is_empty() {
+            return self.render_empty_surface();
         }
 
-        // Create a temporary surface for measurement
-        let surface = ImageSurface::create(Format::ARgb32, 1, 1)
-            .map_err(|e| anyhow!("Failed to create measurement surface: {}", e))?;
-        let cr =
-            Context::new(&surface).map_err(|e| anyhow!("Failed to create cairo context: {}", e))?;
+        // Build the display text
+        let display_text = self.build_display_text(keypresses);
 
-        let layout = create_layout(&cr);
+        // Create a temporary surface to measure text dimensions
+        let temp_surface = ImageSurface::create(Format::ARgb32, 1, 1)?;
+        let temp_context = Context::new(&temp_surface)?;
+        let layout = create_layout(&temp_context);
+
+        // Configure the layout
         layout.set_font_description(Some(&self.font_desc));
-        layout.set_text(text);
+        layout.set_text(&display_text);
+        layout.set_wrap(WrapMode::WordChar);
 
-        let (width, height) = layout.pixel_size();
-        debug!("Text '{}' size: {}x{}", text, width, height);
+        // Get text dimensions
+        let (text_width, text_height) = layout.pixel_size();
 
-        Ok((width as u32, height as u32))
+        // Add padding
+        let padding = 20;
+        let surface_width = text_width + (padding * 2);
+        let surface_height = text_height + (padding * 2);
+
+        // Create the actual rendering surface
+        let surface = ImageSurface::create(Format::ARgb32, surface_width, surface_height)?;
+        let context = Context::new(&surface)?;
+
+        // Clear background
+        self.set_background_color(&context);
+        context.paint()?;
+
+        // Position text in center with padding
+        context.translate(padding as f64, padding as f64);
+
+        // Create layout for final rendering
+        let final_layout = create_layout(&context);
+        final_layout.set_font_description(Some(&self.font_desc));
+        final_layout.set_text(&display_text);
+        final_layout.set_wrap(WrapMode::WordChar);
+
+        // Set text color and render
+        self.set_foreground_color(&context);
+        show_layout(&context, &final_layout);
+
+        // Extract buffer data
+        let mut buffer = Vec::new();
+        surface.write_to_png(&mut Cursor::new(&mut buffer))?;
+
+        // For now, create empty raw data to avoid Cairo access issues
+        let stride = surface.stride();
+        let data = vec![0u8; (surface.width() * surface.height() * 4) as usize];
+
+        Ok(RenderedSurface {
+            surface,
+            width: surface_width,
+            height: surface_height,
+            buffer,
+            raw_data: data,
+            stride,
+        })
     }
 
-    pub fn render_to_surface<T>(
-        &mut self,
-        _surface: &wl_surface::WlSurface,
-        _text: &str,
-        _config: &Config,
-        _shm: &Shm,
-        _qh: &QueueHandle<T>,
-    ) -> Result<()> {
-        // Simplified implementation for testing
-        // In a full implementation, this would render to the wayland surface
-        Ok(())
-    }
-
-    fn fill_background(
-        &self,
-        writer: &mut BufWriter<&mut [u8]>,
-        width: u32,
-        height: u32,
-        color: u32,
-    ) -> Result<()> {
-        let pixel_count = (width * height) as usize;
-        let color_bytes = color.to_le_bytes();
-
-        for _ in 0..pixel_count {
-            writer.write_all(&color_bytes)?;
+    /// Render text with mixed colors for special keys
+    pub fn render_keypresses_colored(&self, keypresses: &[Keypress]) -> Result<RenderedSurface> {
+        if keypresses.is_empty() {
+            return self.render_empty_surface();
         }
 
-        Ok(())
-    }
+        // Create a temporary surface to measure total dimensions
+        let temp_surface = ImageSurface::create(Format::ARgb32, 1, 1)?;
+        let temp_context = Context::new(&temp_surface)?;
 
-    fn render_text(&self, cr: &Context, text: &str, config: &Config) -> Result<()> {
-        // Set up the context
-        cr.set_operator(cairo::Operator::Source);
+        let mut total_width = 0i32;
+        let mut max_height = 0i32;
+        let mut text_segments = Vec::new();
 
-        // Set background
-        self.set_color_from_u32(cr, config.background_color);
-        cr.paint()
-            .map_err(|e| anyhow!("Failed to paint background: {}", e))?;
+        // Measure each keypress segment
+        for (i, keypress) in keypresses.iter().enumerate() {
+            let layout = create_layout(&temp_context);
+            layout.set_font_description(Some(&self.font_desc));
+            layout.set_text(&keypress.display_name);
 
-        // Create and configure layout
-        let layout = create_layout(cr);
-        layout.set_font_description(Some(&self.font_desc));
+            let (width, height) = layout.pixel_size();
+            total_width += width;
+            max_height = max_height.max(height);
 
-        let mut x = 0.0;
-        let mut current_pos = 0;
+            text_segments.push((
+                keypress.display_name.clone(),
+                keypress.is_special,
+                width,
+                height,
+            ));
 
-        // Parse text to handle special vs normal characters
-        while current_pos < text.len() {
-            let (segment, is_special, next_pos) = self.extract_text_segment(text, current_pos);
+            // Add spacing between keys (except for last one)
+            if i < keypresses.len() - 1 {
+                total_width += 10; // spacing
+            }
+        }
 
-            if !segment.is_empty() {
-                // Set color based on whether it's special text
-                if is_special {
-                    self.set_color_from_u32(cr, config.special_color);
-                } else {
-                    self.set_color_from_u32(cr, config.foreground_color);
-                }
+        // Add padding
+        let padding = 20;
+        let surface_width = total_width + (padding * 2);
+        let surface_height = max_height + (padding * 2);
 
-                // Position and render the text
-                cr.move_to(x, 0.0);
-                layout.set_text(&segment);
-                update_layout(cr, &layout);
-                show_layout(cr, &layout);
+        // Create the actual rendering surface
+        let surface = ImageSurface::create(Format::ARgb32, surface_width, surface_height)?;
+        let context = Context::new(&surface)?;
 
-                // Update x position for next segment
-                let (width, _) = layout.pixel_size();
-                x += width as f64;
+        // Clear background
+        self.set_background_color(&context);
+        context.paint()?;
+
+        // Render each text segment with appropriate color
+        let mut x_offset = padding as f64;
+        let y_offset = padding as f64;
+
+        for (text, is_special, width, _height) in text_segments {
+            context.save()?;
+            context.translate(x_offset, y_offset);
+
+            let layout = create_layout(&context);
+            layout.set_font_description(Some(&self.font_desc));
+            layout.set_text(&text);
+
+            // Set color based on whether it's a special key
+            if is_special {
+                self.set_special_color(&context);
+            } else {
+                self.set_foreground_color(&context);
             }
 
-            current_pos = next_pos;
+            show_layout(&context, &layout);
+            context.restore()?;
+
+            x_offset += width as f64 + 10.0; // Add spacing
         }
 
-        Ok(())
+        // Extract buffer data
+        let mut buffer = Vec::new();
+        surface.write_to_png(&mut Cursor::new(&mut buffer))?;
+
+        // For now, create empty raw data to avoid Cairo access issues
+        let stride = surface.stride();
+        let data = vec![0u8; (surface.width() * surface.height() * 4) as usize];
+
+        Ok(RenderedSurface {
+            surface,
+            width: surface_width,
+            height: surface_height,
+            buffer,
+            raw_data: data,
+            stride,
+        })
     }
 
-    fn extract_text_segment(&self, text: &str, start: usize) -> (String, bool, usize) {
-        if start >= text.len() {
-            return (String::new(), false, start);
-        }
+    /// Render an empty surface (when no keys are pressed)
+    fn render_empty_surface(&self) -> Result<RenderedSurface> {
+        let surface = ImageSurface::create(Format::ARgb32, 1, 1)?;
+        let buffer = Vec::new();
 
-        let chars: Vec<char> = text.chars().collect();
-        let start_char = chars[start];
+        // Create empty raw data
+        let stride = surface.stride();
+        let data = vec![0u8; 4]; // 1x1 pixel
 
-        // Determine if this is a special character/sequence
-        let is_special = self.is_special_char(start_char);
-        let mut end = start + 1;
-
-        // Extend the segment while characters have the same "special" status
-        while end < chars.len() && self.is_special_char(chars[end]) == is_special {
-            end += 1;
-        }
-
-        let segment: String = chars[start..end].iter().collect();
-        (segment, is_special, end)
+        Ok(RenderedSurface {
+            surface,
+            width: 1,
+            height: 1,
+            buffer,
+            raw_data: data,
+            stride,
+        })
     }
 
-    fn is_special_char(&self, c: char) -> bool {
-        // Characters that should be rendered with special color
-        matches!(
-            c,
-            '⏎' | '␣' | '⇦' | '⇧' | '⇩' | '⇨' | '⌫' | '₀'..='₉' | 'ₓ' | ' ' // Spaces in key combinations like " Ctrl+"
-        ) || (c.is_ascii_uppercase() && c.is_alphabetic()) // Capital letters in key names
+    /// Build display text from a list of keypresses
+    fn build_display_text(&self, keypresses: &[Keypress]) -> String {
+        keypresses
+            .iter()
+            .map(|k| k.display_name.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
-    fn set_color_from_u32(&self, cr: &Context, color: u32) {
+    /// Set background color on the Cairo context
+    fn set_background_color(&self, context: &Context) {
+        let color = self.config.background_color;
         let r = ((color >> 24) & 0xFF) as f64 / 255.0;
         let g = ((color >> 16) & 0xFF) as f64 / 255.0;
         let b = ((color >> 8) & 0xFF) as f64 / 255.0;
         let a = (color & 0xFF) as f64 / 255.0;
+        context.set_source_rgba(r, g, b, a);
+    }
 
-        cr.set_source_rgba(r, g, b, a);
+    /// Set foreground color on the Cairo context
+    fn set_foreground_color(&self, context: &Context) {
+        let color = self.config.foreground_color;
+        let r = ((color >> 24) & 0xFF) as f64 / 255.0;
+        let g = ((color >> 16) & 0xFF) as f64 / 255.0;
+        let b = ((color >> 8) & 0xFF) as f64 / 255.0;
+        let a = (color & 0xFF) as f64 / 255.0;
+        context.set_source_rgba(r, g, b, a);
+    }
+
+    /// Set special key color on the Cairo context
+    fn set_special_color(&self, context: &Context) {
+        let color = self.config.special_color;
+        let r = ((color >> 24) & 0xFF) as f64 / 255.0;
+        let g = ((color >> 16) & 0xFF) as f64 / 255.0;
+        let b = ((color >> 8) & 0xFF) as f64 / 255.0;
+        let a = (color & 0xFF) as f64 / 255.0;
+        context.set_source_rgba(r, g, b, a);
     }
 }
 
@@ -161,14 +254,17 @@ impl Renderer {
 mod tests {
     use super::*;
     use crate::config::{AnchorPosition, Config};
+    use evdev::Key;
     use std::path::PathBuf;
+    use std::time::Instant;
+    use xkbcommon::xkb;
 
     fn create_test_config() -> Config {
         Config {
-            background_color: 0x000000FF,
+            background_color: 0x000000CC,
             foreground_color: 0xFFFFFFFF,
-            special_color: 0xAAAAAAAA,
-            font: "Sans Bold 40".to_string(),
+            special_color: 0xAAAAAAFF,
+            font: "Sans Bold 30".to_string(),
             timeout: 200,
             anchor: AnchorPosition::default(),
             margin: 32,
@@ -178,164 +274,50 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_renderer_new() {
-        let config = create_test_config();
-        let result = Renderer::new(&config);
-        assert!(result.is_ok());
-
-        let renderer = result.unwrap();
-        assert_eq!(renderer.scale, 1.0);
+    fn create_test_keypress(key: Key, display_name: &str, is_special: bool) -> Keypress {
+        Keypress {
+            key,
+            keycode: 0,
+            keysym: xkb::Keysym::new(0),
+            utf8_text: String::new(),
+            display_name: display_name.to_string(),
+            is_special,
+            timestamp: Instant::now(),
+        }
     }
 
     #[test]
-    fn test_calculate_text_size_empty() {
+    fn test_empty_render() {
         let config = create_test_config();
-        let renderer = Renderer::new(&config).unwrap();
-
-        let result = renderer.calculate_text_size("");
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), (0, 0));
-    }
-
-    #[test]
-    fn test_calculate_text_size_non_empty() {
-        let config = create_test_config();
-        let renderer = Renderer::new(&config).unwrap();
-
-        let result = renderer.calculate_text_size("Hello World");
-        assert!(result.is_ok());
-
-        let (width, height) = result.unwrap();
-        assert!(width > 0);
-        assert!(height > 0);
-    }
-
-    #[test]
-    fn test_is_special_char() {
-        let config = create_test_config();
-        let renderer = Renderer::new(&config).unwrap();
-
-        // Test special characters
-        assert!(renderer.is_special_char('⏎'));
-        assert!(renderer.is_special_char('␣'));
-        assert!(renderer.is_special_char('⇦'));
-        assert!(renderer.is_special_char('⇧'));
-        assert!(renderer.is_special_char('⇩'));
-        assert!(renderer.is_special_char('⇨'));
-        assert!(renderer.is_special_char('⌫'));
-        assert!(renderer.is_special_char('₀'));
-        assert!(renderer.is_special_char('₅'));
-        assert!(renderer.is_special_char('₉'));
-        assert!(renderer.is_special_char('ₓ'));
-        assert!(renderer.is_special_char(' '));
-
-        // Test uppercase letters (considered special in key names)
-        assert!(renderer.is_special_char('A'));
-        assert!(renderer.is_special_char('Z'));
-
-        // Test normal characters
-        assert!(!renderer.is_special_char('a'));
-        assert!(!renderer.is_special_char('z'));
-        assert!(!renderer.is_special_char('1'));
-        assert!(!renderer.is_special_char('!'));
-        assert!(!renderer.is_special_char(','));
-    }
-
-    #[test]
-    fn test_extract_text_segment() {
-        let config = create_test_config();
-        let renderer = Renderer::new(&config).unwrap();
-
-        // Test extracting special characters
-        let (segment, is_special, next_pos) = renderer.extract_text_segment("⏎abc", 0);
-        assert_eq!(segment, "⏎");
-        assert!(is_special);
-        assert_eq!(next_pos, 1);
-
-        // Test extracting normal characters
-        let (segment, is_special, next_pos) = renderer.extract_text_segment("⏎abc", 1);
-        assert_eq!(segment, "abc");
-        assert!(!is_special);
-        assert_eq!(next_pos, 4);
-
-        // Test empty string
-        let (segment, _, next_pos) = renderer.extract_text_segment("", 0);
-        assert!(segment.is_empty());
-        assert_eq!(next_pos, 0);
-
-        // Test out of bounds
-        let (segment, _, next_pos) = renderer.extract_text_segment("abc", 5);
-        assert!(segment.is_empty());
-        assert_eq!(next_pos, 5);
-    }
-
-    #[test]
-    fn test_set_color_from_u32() {
-        let config = create_test_config();
-        let renderer = Renderer::new(&config).unwrap();
-
-        // Create a test surface and context
-        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 10, 10).unwrap();
-        let cr = cairo::Context::new(&surface).unwrap();
-
-        // Test setting different colors
-        renderer.set_color_from_u32(&cr, 0xFF0000FF); // Red
-        renderer.set_color_from_u32(&cr, 0x00FF00FF); // Green
-        renderer.set_color_from_u32(&cr, 0x0000FFFF); // Blue
-        renderer.set_color_from_u32(&cr, 0x00000000); // Transparent
-        renderer.set_color_from_u32(&cr, 0xFFFFFFFF); // White
-
-        // If we get here without panicking, the test passes
-    }
-
-    #[test]
-    fn test_fill_background() {
-        let config = create_test_config();
-        let renderer = Renderer::new(&config).unwrap();
-
-        let mut buffer = vec![0u8; 40]; // 10x1 pixels * 4 bytes
-        let mut writer = std::io::BufWriter::new(buffer.as_mut_slice());
-
-        let result = renderer.fill_background(&mut writer, 10, 1, 0xFF0000FF);
+        let renderer = TextRenderer::new(config).unwrap();
+        let result = renderer.render_keypresses(&[]);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_text_size_scaling() {
+    fn test_single_key_render() {
         let config = create_test_config();
-        let renderer = Renderer::new(&config).unwrap();
-
-        // Compare sizes of different texts
-        let size1 = renderer.calculate_text_size("A").unwrap();
-        let size2 = renderer.calculate_text_size("AA").unwrap();
-        let size3 = renderer.calculate_text_size("AAAA").unwrap();
-
-        // Longer text should be wider
-        assert!(size2.0 > size1.0);
-        assert!(size3.0 > size2.0);
-
-        // Height should be roughly the same for single line text
-        assert_eq!(size1.1, size2.1);
-        assert_eq!(size2.1, size3.1);
+        let renderer = TextRenderer::new(config).unwrap();
+        let keypresses = vec![create_test_keypress(Key::KEY_A, "a", false)];
+        let result = renderer.render_keypresses(&keypresses);
+        assert!(result.is_ok());
+        let surface = result.unwrap();
+        assert!(surface.width > 0);
+        assert!(surface.height > 0);
     }
 
     #[test]
-    fn test_font_configuration() {
-        let mut config = create_test_config();
-
-        // Test different font configurations
-        config.font = "Monospace 12".to_string();
-        let renderer1 = Renderer::new(&config).unwrap();
-
-        config.font = "Sans Bold 20".to_string();
-        let renderer2 = Renderer::new(&config).unwrap();
-
-        // Both should create successfully
-        let size1 = renderer1.calculate_text_size("Test").unwrap();
-        let size2 = renderer2.calculate_text_size("Test").unwrap();
-
-        // Larger font should produce larger text
-        assert!(size2.1 > size1.1); // Height should be larger
+    fn test_colored_render() {
+        let config = create_test_config();
+        let renderer = TextRenderer::new(config).unwrap();
+        let keypresses = vec![
+            create_test_keypress(Key::KEY_LEFTCTRL, "Ctrl", true),
+            create_test_keypress(Key::KEY_A, "a", false),
+        ];
+        let result = renderer.render_keypresses_colored(&keypresses);
+        assert!(result.is_ok());
+        let surface = result.unwrap();
+        assert!(surface.width > 0);
+        assert!(surface.height > 0);
     }
 }

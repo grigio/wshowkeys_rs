@@ -110,6 +110,11 @@ impl KeyBuffer {
         self.keys.is_empty()
     }
 
+    /// Get a vec of current keypresses
+    pub fn get_current_keys(&self) -> Vec<Keypress> {
+        self.keys.iter().cloned().collect()
+    }
+
     fn update_modifier_state(&mut self, keypress: &Keypress) {
         // This would be called for both press and release events
         // For now, we'll implement a simplified version focusing on press events

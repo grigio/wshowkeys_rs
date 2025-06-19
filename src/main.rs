@@ -11,7 +11,8 @@ mod utils;
 
 use config::{Config, Args};
 use input::InputManager;
-use wayland::WaylandClient;
+use wayland::WaylandDisplay;
+use renderer::TextRenderer;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,18 +43,23 @@ async fn main() -> Result<()> {
             std::process::exit(1);
         }
     };
-    let wayland_client = WaylandClient::new(&config).await?;
+    
+    // Initialize renderer and wayland display
+    let renderer = TextRenderer::new(config.clone())?;
+    let mut wayland_display = WaylandDisplay::new(config.clone())?;
+    wayland_display.initialize()?;
 
     // Main event loop
     info!("Starting main event loop...");
-    run_main_loop(input_manager, wayland_client, config).await?;
+    run_main_loop(input_manager, wayland_display, renderer, config).await?;
 
     Ok(())
 }
 
 async fn run_main_loop(
     mut input_manager: InputManager,
-    mut wayland_client: WaylandClient,
+    mut wayland_display: WaylandDisplay,
+    renderer: TextRenderer,
     config: Config,
 ) -> Result<()> {
     let mut key_buffer = keypress::KeyBuffer::new(config.timeout, config.length_limit);
@@ -71,7 +77,15 @@ async fn run_main_loop(
                         if let Some(keypress) = keypress::process_input_event(event)? {
                             debug!("Adding keypress to buffer: '{}'", keypress.display_name);
                             key_buffer.add_keypress(keypress);
-                            wayland_client.update_display(&key_buffer, &config).await?;
+                            
+                            // Render and display the keypresses
+                            let current_keys = key_buffer.get_current_keys();
+                            if !current_keys.is_empty() {
+                                let rendered = renderer.render_keypresses_colored(&current_keys)?;
+                                wayland_display.update_display(&rendered)?;
+                            } else {
+                                wayland_display.hide_display()?;
+                            }
                         } else {
                             debug!("process_input_event returned None for event: type={:?}, code={}, value={}", 
                                    event.event_type(), event.code(), event.value());
@@ -88,29 +102,25 @@ async fn run_main_loop(
                 }
             }
 
-            // Handle wayland events
-            wayland_event = wayland_client.next_event() => {
-                debug!("Selected WAYLAND branch - Received wayland_event result from WaylandClient");
-                match wayland_event {
-                    Ok(should_continue) => {
-                        if !should_continue {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        error!("Wayland error: {}", e);
-                        break;
-                    }
-                }
-            }
-
             // Handle timeout for clearing old keys
             _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
                 debug!("Selected TIMEOUT branch - Checking for expired keys");
                 if key_buffer.cleanup_expired() {
-                    wayland_client.update_display(&key_buffer, &config).await?;
+                    let current_keys = key_buffer.get_current_keys();
+                    if !current_keys.is_empty() {
+                        let rendered = renderer.render_keypresses_colored(&current_keys)?;
+                        wayland_display.update_display(&rendered)?;
+                    } else {
+                        wayland_display.hide_display()?;
+                    }
                 }
             }
+        }
+        
+        // Process Wayland events to handle display updates
+        if let Err(e) = wayland_display.dispatch_events() {
+            error!("Wayland dispatch error: {}", e);
+            break;
         }
     }
 

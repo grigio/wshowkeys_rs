@@ -1603,6 +1603,7 @@ dependencies = [
  "evdev",
  "libc",
  "log",
+ "memmap2 0.9.5",
  "mockall",
  "nix 0.29.0",
  "pango",
