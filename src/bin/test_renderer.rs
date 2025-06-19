@@ -1,12 +1,11 @@
 use anyhow::Result;
 use evdev::Key;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use wshowkeys_rs::{
     config::{AnchorPosition, Config},
     keypress::Keypress,
     renderer::TextRenderer,
-    wayland::WaylandDisplay,
 };
 use xkbcommon::xkb;
 
@@ -47,105 +46,94 @@ async fn main() -> Result<()> {
     // Initialize logging
     env_logger::init();
 
-    println!("Testing text renderer with Wayland display...");
+    println!("Testing text renderer (off-screen rendering only)...");
 
     let config = create_test_config();
     let renderer = TextRenderer::new(config.clone())?;
 
-    // Initialize Wayland display
-    println!("Initializing Wayland display...");
-    let mut wayland_display = WaylandDisplay::new(config)?;
-    wayland_display.initialize()?;
-    println!("Wayland display initialized successfully!");
-
-    // Wait for the surface to be configured by the compositor
-    println!("Waiting for surface configuration...");
-    let mut attempts = 0;
-    while attempts < 20 && !wayland_display.is_configured() {
-        // Use sync dispatch during initialization to ensure events are processed
-        if let Err(_) = wayland_display.dispatch_events_sync() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        attempts += 1;
-    }
-
-    if wayland_display.is_configured() {
-        println!("Surface configuration completed!");
-    } else {
-        println!("Warning: Surface may not be fully configured yet");
-    }
-
-    // Test 1: Display single key (with larger text to make it more visible)
-    println!("Displaying single key 'A'...");
-    let single_key = vec![create_test_keypress(Key::KEY_A, "A", false)]; // Use uppercase A
+    // Test 1: Render single key (off-screen only)
+    println!("Testing single key 'A' rendering...");
+    let single_key = vec![create_test_keypress(Key::KEY_A, "A", false)];
     let single_result = renderer.render_keypresses(&single_key)?;
     println!(
-        "Rendered size: {}x{}, attempting to display...",
+        "✓ Single key rendered successfully: {}x{} pixels",
         single_result.width, single_result.height
     );
+    println!("  Buffer size: {} bytes", single_result.buffer.len());
 
-    wayland_display.update_display(&single_result)?;
-    println!(
-        "Single key displayed: {}x{}",
-        single_result.width, single_result.height
-    );
-
-    println!("Waiting 5 seconds for 'A' to be visible...");
-    // Wait and process events using async
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    let _ = wayland_display.dispatch_events().await;
-    println!("First test completed, moving to next test...");
-
-    // Test 2: Display key combination
-    println!("Displaying key combination 'Ctrl+a'...");
+    // Test 2: Render key combination
+    println!("Testing key combination 'Ctrl+a' rendering...");
     let combination = vec![
         create_test_keypress(Key::KEY_LEFTCTRL, "Ctrl", true),
         create_test_keypress(Key::KEY_A, "a", false),
     ];
     let combo_result = renderer.render_keypresses(&combination)?;
-    wayland_display.update_display(&combo_result)?;
     println!(
-        "Combination displayed: {}x{}",
+        "✓ Key combination rendered successfully: {}x{} pixels",
         combo_result.width, combo_result.height
     );
+    println!("  Buffer size: {} bytes", combo_result.buffer.len());
 
-    // Wait and process events using async
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    let _ = wayland_display.dispatch_events().await;
-
-    // Test 3: Display complex combination
-    println!("Displaying complex combination 'Ctrl+Shift+T'...");
+    // Test 3: Render complex combination
+    println!("Testing complex combination 'Ctrl+Shift+T' rendering...");
     let complex_combo = vec![
         create_test_keypress(Key::KEY_LEFTCTRL, "Ctrl", true),
         create_test_keypress(Key::KEY_LEFTSHIFT, "Shift", true),
         create_test_keypress(Key::KEY_T, "T", false),
     ];
     let complex_result = renderer.render_keypresses(&complex_combo)?;
-    wayland_display.update_display(&complex_result)?;
     println!(
-        "Complex combination displayed: {}x{}",
+        "✓ Complex combination rendered successfully: {}x{} pixels",
         complex_result.width, complex_result.height
     );
+    println!("  Buffer size: {} bytes", complex_result.buffer.len());
 
-    // Wait and process events using async
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    let _ = wayland_display.dispatch_events().await;
+    // Test 4: Render empty keypress list
+    println!("Testing empty keypress list rendering...");
+    let empty_result = renderer.render_keypresses(&vec![])?;
+    println!(
+        "✓ Empty keypress list handled: {}x{} pixels",
+        empty_result.width, empty_result.height
+    );
 
-    // Test 4: Hide display
-    println!("Hiding display...");
-    wayland_display.hide_display()?;
+    // Test 5: Render very long combination
+    println!("Testing long key combination rendering...");
+    let long_combo = vec![
+        create_test_keypress(Key::KEY_LEFTCTRL, "Ctrl", true),
+        create_test_keypress(Key::KEY_LEFTSHIFT, "Shift", true),
+        create_test_keypress(Key::KEY_LEFTALT, "Alt", true),
+        create_test_keypress(Key::KEY_LEFTMETA, "Super", true),
+        create_test_keypress(Key::KEY_T, "T", false),
+    ];
+    let long_result = renderer.render_keypresses(&long_combo)?;
+    println!(
+        "✓ Long combination rendered successfully: {}x{} pixels",
+        long_result.width, long_result.height
+    );
 
-    // Final wait to see the hide effect
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    println!("\nAll rendering tests completed successfully!");
+    println!("Summary:");
+    println!(
+        "- Single key: {}x{}",
+        single_result.width, single_result.height
+    );
+    println!(
+        "- Key combination: {}x{}",
+        combo_result.width, combo_result.height
+    );
+    println!(
+        "- Complex combination: {}x{}",
+        complex_result.width, complex_result.height
+    );
+    println!(
+        "- Empty list: {}x{}",
+        empty_result.width, empty_result.height
+    );
+    println!(
+        "- Long combination: {}x{}",
+        long_result.width, long_result.height
+    );
+    println!("\nNo visual display was shown - this was an off-screen rendering test only.");
 
-    println!("All tests completed successfully!");
-    println!("You should have seen:");
-    println!("1. Single 'A' key displayed for 2 seconds");
-    println!("2. 'Ctrl+a' combination displayed for 2 seconds");
-    println!("3. 'Ctrl+Shift+T' combination displayed for 1 second");
-    println!("4. Display hidden");
-
-    println!("Exiting...");
     Ok(())
 }
