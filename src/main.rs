@@ -147,7 +147,7 @@ async fn run_main_loop(
 
                 // Dispatch Wayland events to keep the display responsive
                 debug!("About to dispatch Wayland events");
-                if let Err(e) = wayland_display.dispatch_events() {
+                if let Err(e) = wayland_display.dispatch_events().await {
                     error!("Failed to dispatch Wayland events: {}", e);
                 }
                 debug!("Wayland events dispatched");

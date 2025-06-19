@@ -12,18 +12,18 @@ use xkbcommon::xkb;
 
 fn create_test_config() -> Config {
     Config {
-        background_color: 0x000000DD,     // Slightly more opaque background
+        background_color: 0xFF0000FF,     // Red background - highly visible
         foreground_color: 0xFFFFFFFF,     // White text
-        special_color: 0x0000FFFF,        // Green for special keys
-        font: "Sans Bold 24".to_string(), // Slightly smaller font for testing
+        special_color: 0x00FF00FF,        // Bright green for special keys
+        font: "Sans Bold 72".to_string(), // Even larger font for testing
         timeout: 200,
         anchor: AnchorPosition {
-            top: false,
-            bottom: true, // Anchor to bottom
+            top: true,
+            bottom: false,
             left: true,
-            right: false, // Anchor to right (bottom-right corner)
+            right: true, // Fill the width
         },
-        margin: 50, // More margin from edges
+        margin: 10, // Small margin to see edges
         length_limit: 100,
         output: None,
         device_path: PathBuf::from("/dev/input"),
@@ -42,7 +42,11 @@ fn create_test_keypress(key: Key, display_name: &str, is_special: bool) -> Keypr
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize logging
+    env_logger::init();
+
     println!("Testing text renderer with Wayland display...");
 
     let config = create_test_config();
@@ -58,10 +62,11 @@ fn main() -> Result<()> {
     println!("Waiting for surface configuration...");
     let mut attempts = 0;
     while attempts < 20 && !wayland_display.is_configured() {
-        if let Err(_) = wayland_display.dispatch_events() {
+        // Use sync dispatch during initialization to ensure events are processed
+        if let Err(_) = wayland_display.dispatch_events_sync() {
             break;
         }
-        std::thread::sleep(Duration::from_millis(100));
+        tokio::time::sleep(Duration::from_millis(100)).await;
         attempts += 1;
     }
 
@@ -72,23 +77,24 @@ fn main() -> Result<()> {
     }
 
     // Test 1: Display single key (with larger text to make it more visible)
-    println!("Displaying single key 'a'...");
+    println!("Displaying single key 'A'...");
     let single_key = vec![create_test_keypress(Key::KEY_A, "A", false)]; // Use uppercase A
-    let single_result = renderer.render_keypresses_colored(&single_key)?;
+    let single_result = renderer.render_keypresses(&single_key)?;
     println!(
         "Rendered size: {}x{}, attempting to display...",
         single_result.width, single_result.height
     );
+
     wayland_display.update_display(&single_result)?;
     println!(
         "Single key displayed: {}x{}",
         single_result.width, single_result.height
     );
 
-    println!("Waiting 2 seconds for 'A' to be visible...");
-    // Wait and process events
-    std::thread::sleep(Duration::from_secs(2));
-    let _ = wayland_display.dispatch_events();
+    println!("Waiting 5 seconds for 'A' to be visible...");
+    // Wait and process events using async
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    let _ = wayland_display.dispatch_events().await;
     println!("First test completed, moving to next test...");
 
     // Test 2: Display key combination
@@ -97,16 +103,16 @@ fn main() -> Result<()> {
         create_test_keypress(Key::KEY_LEFTCTRL, "Ctrl", true),
         create_test_keypress(Key::KEY_A, "a", false),
     ];
-    let combo_result = renderer.render_keypresses_colored(&combination)?;
+    let combo_result = renderer.render_keypresses(&combination)?;
     wayland_display.update_display(&combo_result)?;
     println!(
         "Combination displayed: {}x{}",
         combo_result.width, combo_result.height
     );
 
-    // Wait and process events
-    std::thread::sleep(Duration::from_secs(2));
-    let _ = wayland_display.dispatch_events();
+    // Wait and process events using async
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let _ = wayland_display.dispatch_events().await;
 
     // Test 3: Display complex combination
     println!("Displaying complex combination 'Ctrl+Shift+T'...");
@@ -115,27 +121,27 @@ fn main() -> Result<()> {
         create_test_keypress(Key::KEY_LEFTSHIFT, "Shift", true),
         create_test_keypress(Key::KEY_T, "T", false),
     ];
-    let complex_result = renderer.render_keypresses_colored(&complex_combo)?;
+    let complex_result = renderer.render_keypresses(&complex_combo)?;
     wayland_display.update_display(&complex_result)?;
     println!(
         "Complex combination displayed: {}x{}",
         complex_result.width, complex_result.height
     );
 
-    // Wait and process events
-    std::thread::sleep(Duration::from_secs(3));
-    let _ = wayland_display.dispatch_events();
+    // Wait and process events using async
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    let _ = wayland_display.dispatch_events().await;
 
     // Test 4: Hide display
     println!("Hiding display...");
     wayland_display.hide_display()?;
 
     // Final wait to see the hide effect
-    std::thread::sleep(Duration::from_millis(500));
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     println!("All tests completed successfully!");
     println!("You should have seen:");
-    println!("1. Single 'a' key displayed for 2 seconds");
+    println!("1. Single 'A' key displayed for 2 seconds");
     println!("2. 'Ctrl+a' combination displayed for 2 seconds");
     println!("3. 'Ctrl+Shift+T' combination displayed for 1 second");
     println!("4. Display hidden");
