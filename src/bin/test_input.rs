@@ -23,35 +23,47 @@ async fn main() -> Result<()> {
             println!("✅ InputManager initialized successfully!");
             println!("Looking for events from your Magic Keyboard...");
             println!("Please type some keys to test (Ctrl+C to exit)");
+            println!("Running indefinitely - press Ctrl+C to stop");
 
             let mut event_count = 0;
             let mut key_event_count = 0;
-            
+
             loop {
                 match input_manager.next_event().await {
                     Ok(Some(event)) => {
                         event_count += 1;
-                        
+
                         if event.event_type() == EventType::KEY {
                             key_event_count += 1;
                             let action = match event.value() {
                                 0 => "🔓 Released",
-                                1 => "🔒 Pressed", 
+                                1 => "🔒 Pressed",
                                 2 => "🔄 Repeated",
                                 _ => "❓ Unknown",
                             };
-                            println!("Event #{}: {} Key code {} (value={})", 
-                                   event_count, action, event.code(), event.value());
+                            println!(
+                                "Event #{}: {} Key code {} (value={})",
+                                event_count,
+                                action,
+                                event.code(),
+                                event.value()
+                            );
                         } else {
-                            println!("Event #{}: {:?} code={} value={}", 
-                                   event_count, event.event_type(), event.code(), event.value());
+                            println!(
+                                "Event #{}: {:?} code={} value={}",
+                                event_count,
+                                event.event_type(),
+                                event.code(),
+                                event.value()
+                            );
                         }
 
-                        // Show first 50 events instead of 20 for better testing
-                        if event_count >= 50 {
-                            println!("✅ Successfully captured {} events ({} key events)!", 
-                                   event_count, key_event_count);
-                            break;
+                        // Print status every 100 events to show it's still running
+                        if event_count % 100 == 0 {
+                            println!(
+                                "📊 Status: {} total events, {} key events captured",
+                                event_count, key_event_count
+                            );
                         }
                     }
                     Ok(None) => {

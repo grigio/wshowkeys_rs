@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use evdev::{Device, InputEvent};
 use log::{debug, error, info, warn};
+use serde::de;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -270,14 +271,19 @@ impl InputManager {
 
         info!("Started {} device tasks", join_handles.len());
 
-        // Wait for all device tasks to complete (they should run indefinitely)
-        for handle in join_handles {
-            if let Err(e) = handle.await {
-                error!("Device task failed: {}", e);
+        // Store the handles for cleanup, but don't wait for them here
+        // The tasks will run indefinitely and send events through the channel
+        tokio::spawn(async move {
+            // Monitor the tasks in the background
+            for handle in join_handles {
+                if let Err(e) = handle.await {
+                    error!("Device task failed: {}", e);
+                }
             }
-        }
+            info!("All device event handlers stopped");
+        });
 
-        info!("All device event handlers stopped");
+        info!("Event loop setup complete - device tasks are running");
     }
 }
 
