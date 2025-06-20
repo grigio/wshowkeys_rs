@@ -3,42 +3,28 @@
 ## [1.2.0] - 2025-06-20
 
 ### Added
-- **Native Wayland Support**: GUI overlay window support using eframe/egui for better Wayland compatibility
-- **Hyprland Compatibility**: GUI overlay now properly registers as a client in Hyprland compositor
-- **Real-time Keystroke Display**: Fixed channel communication between input handler and GUI renderer
-- **Semi-transparent Overlay**: Enhanced visual appearance with styled key display and rounded borders
-- **Always-on-Top Window**: Overlay window with no decorations, positioned at bottom-right of screen
-- **Key Event Processing**: Synchronous egui update loop using `try_recv()` for responsive display
-- `src/egui_render.rs`: eframe/egui-based transparent overlay implementation
-- Dependencies: eframe 0.28, egui 0.28
+- **Native Wayland Support**: Real-time transparent overlay using eframe/egui
+- **Hyprland Integration**: Fully transparent, borderless overlay with window rules
+- **Auto-hide/show**: Overlay appears on keypress, hides after 3s timeout
+- eframe/egui dependencies for cross-platform GUI
 
 ### Changed
-- **Default Mode**: GUI mode is now the default; console mode requires `--console` flag
-- **Architecture**: Uses eframe/egui for cross-platform GUI with native Wayland support
-- Updated `src/app.rs` to support both console and GUI render modes with egui as primary
-- Enhanced `src/main.rs` with mode selection logic (GUI default, `--console` for terminal output)
-- **Documentation**: Updated README.md to reflect egui as primary GUI solution
+- **Default Mode**: GUI overlay (use `--console` for terminal output)
+- **Architecture**: eframe/egui replaces console as primary interface
+- Enhanced visual styling with age-based key fading and glow effects
 
 ### Fixed
-- **Critical**: Fixed key events not reaching GUI renderer due to async/blocking conflict
-- **Window Visibility**: Ensured GUI overlay appears and registers properly in Wayland compositors
-- **Channel Communication**: Resolved blocking eframe preventing tokio runtime from processing events
-- **Timeout Logic**: Fixed to clear all keys 3s after last keystroke (was clearing individual keys)
+- Key events now properly reach GUI renderer
+- Overlay visibility and transparency in Wayland compositors
+- Timeout logic clears all keys 3s after last keystroke
 
 ## [1.1.0] - 2025-06-20
 
 ### Added
-- Initial MVP console implementation
-- `src/input.rs`: evdev keyboard input capture with multi-device support
-- `src/render.rs`: console text rendering with 3s timeout cleanup
-- `src/app.rs`: async communication between components
-- `src/main.rs`: application entry point
-- Dependencies: evdev, tokio, anyhow, log, env_logger
-- README.md with usage instructions
-- ARCH.md development roadmap
-
-### Changed
-- N/A (initial release)
+- Initial console implementation with evdev input capture
+- Multi-device keyboard support
+- 3-second key display timeout
+- Core dependencies: evdev, tokio, anyhow, log
 
 ### Fixed
-- Fixed timeout logic to clear all keys 3s after last keystroke (was clearing individual keys)
+- Timeout logic for key clearing
