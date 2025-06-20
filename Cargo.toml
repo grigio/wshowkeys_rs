@@ -7,3 +7,58 @@ description = "A Rust implementation of wshowkeys - displays keystrokes on scree
 license = "GPL-3.0"
 keywords = ["wayland", "keylogger", "display", "input"]
 categories = ["multimedia", "gui"]
+
+[[bin]]
+name = "wshowkeys_rs"
+path = "src/main.rs"
+
+[[bin]]
+name = "wshowkeys_rs_simple"
+path = "src/main_simple.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Wayland support
+wayland-client = "0.31"
+wayland-protocols = "0.31"
+
+# GPU rendering
+wgpu = "0.19"
+winit = "0.29"
+
+# Text rendering
+wgpu_glyph = "0.20"
+fontdue = "0.7"
+
+# Configuration
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Directories for config paths
+dirs = "5.0"
+
+# Hyprland IPC
+hyprland = "0.3"
+
+# JSON parsing
+serde_json = "1.0"
+
+# Additional system dependencies
+fontdb = "0.16"
+raw-window-handle = "0.6"
+
+# Event handling
+crossbeam-channel = "0.5"
