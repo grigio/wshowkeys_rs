@@ -11,3 +11,13 @@ categories = ["multimedia", "gui"]
 [[bin]]
 name = "wshowkeys_rs"
 path = "src/main.rs"
+
+[dependencies]
+# Input handling
+evdev = "0.12"
+tokio = { version = "1.0", features = ["full"] }
+
+# Utilities
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.10"
