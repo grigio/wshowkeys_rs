@@ -25,45 +25,45 @@ wshowkeys_rs/
 **Goal**: Basic keystroke capture and display
 
 **Tasks**:
-- Set up Wayland connection and input capture
-- Implement basic text rendering with Cairo
-- Create overlay window with transparency
-- Add CLI argument parsing and basic config
+- [ ] Set up Wayland connection and input capture
+- [ ] Implement basic text rendering with Cairo
+- [ ] Create overlay window with transparency
+- [ ] Add CLI argument parsing and basic config
 
 **Key Features**:
-- Real-time keystroke display
-- Basic window positioning
-- Simple configuration
+- [ ] Real-time keystroke display
+- [ ] Basic window positioning
+- [ ] Simple configuration
 
 ### Phase 2: Enhanced Features
 **Goal**: Polish and advanced functionality
 
 **Tasks**:
-- Special key mapping (arrows, modifiers, function keys)
-- Key combination detection and repeat counting
-- Timeout-based keystroke clearing
-- Customizable themes and positioning
+- [ ] Special key mapping (arrows, modifiers, function keys)
+- [ ] Key combination detection and repeat counting
+- [ ] Timeout-based keystroke clearing
+- [ ] Customizable themes and positioning
 
 **Key Features**:
-- Smart key name display
-- Combination key grouping
-- Auto-clear old keystrokes
-- Theme customization
+- [ ] Smart key name display
+- [ ] Combination key grouping
+- [ ] Auto-clear old keystrokes
+- [ ] Theme customization
 
 ### Phase 3: Multi-Output & Polish
 **Goal**: Production-ready application
 
 **Tasks**:
-- Multi-monitor support
-- Performance optimization
-- Runtime configuration changes
-- Documentation and packaging
+- [ ] Multi-monitor support
+- [ ] Performance optimization
+- [ ] Runtime configuration changes
+- [ ] Documentation and packaging
 
 **Key Features**:
-- Multi-output display
-- Low resource usage
-- Hot configuration reload
-- Package distribution
+- [ ] Multi-output display
+- [ ] Low resource usage
+- [ ] Hot configuration reload
+- [ ] Package distribution
 
 ## Core Dependencies
 
@@ -93,14 +93,14 @@ pango = "0.18"
 
 ## Code Guidelines
 
-- Use `anyhow::Result<T>` for error handling
-- Implement async with `tokio` for timers and events
-- Keep modules simple and focused
-- Use proper Rust documentation
-- Handle errors gracefully with user-friendly messages
+- [ ] Use `anyhow::Result<T>` for error handling
+- [ ] Implement async with `tokio` for timers and events
+- [ ] Keep modules simple and focused
+- [ ] Use proper Rust documentation
+- [ ] Handle errors gracefully with user-friendly messages
 
 ## Success Criteria
 
-- **Phase 1**: Basic keystroke display working
-- **Phase 2**: Special keys and combinations work
-- **Phase 3**: Multi-monitor support and optimized performance
+- [ ] **Phase 1**: Basic keystroke display working
+- [ ] **Phase 2**: Special keys and combinations work
+- [ ] **Phase 3**: Multi-monitor support and optimized performance
