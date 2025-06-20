@@ -7,11 +7,3 @@ description = "A Rust implementation of wshowkeys - displays keystrokes on scree
 license = "GPL-3.0"
 keywords = ["wayland", "keylogger", "display", "input"]
 categories = ["multimedia", "gui"]
-
-[dependencies]
-# Phase 1 dependencies
-wayland-client = "0.31"
-wayland-protocols = "0.31"
-clap = { version = "4.4", features = ["derive"] }
-anyhow = "1.0"
-tokio = { version = "1.0", features = ["full"] }
