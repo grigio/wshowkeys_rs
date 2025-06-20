@@ -1,6 +1,6 @@
 [package]
 name = "wshowkeys_rs"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 authors = ["isomo <jiahaoxiang2000@gmail.com>"]
 description = "A Rust implementation of wshowkeys - displays keystrokes on screen using global input capture"
