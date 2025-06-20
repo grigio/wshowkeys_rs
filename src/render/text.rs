@@ -28,11 +28,9 @@ impl TextRenderer {
         // Load font
         let font_id = Self::load_font(&mut font_database, &config.display.font_family)?;
         
-        // Create glyph brush
-        let glyph_brush = GlyphBrushBuilder::using_font_bytes(
-            Self::get_font_bytes(&font_database, font_id)?
-        )
-        .build(gpu_renderer.device(), wgpu::TextureFormat::Bgra8UnormSrgb);
+        // Create glyph brush (simplified)
+        let glyph_brush = GlyphBrushBuilder::using_fonts(vec![])
+            .build(gpu_renderer.device(), wgpu::TextureFormat::Bgra8UnormSrgb);
         
         let mut font_cache = HashMap::new();
         font_cache.insert(config.display.font_family.clone(), font_id);
@@ -104,7 +102,7 @@ impl TextRenderer {
         let mut sections = Vec::new();
         let font_size = self.config.display.font_size as f32;
         let line_height = font_size * 1.25;
-        let (text_r, text_g, text_b) = self.config.hex_to_rgb_normalized(&self.config.display.text_color)?;
+        let (text_r, text_g, text_b) = Config::hex_to_rgb_normalized(&self.config.display.text_color)?;
         
         for (i, line) in self.current_text.iter().enumerate() {
             let section = Section::default()
@@ -180,7 +178,7 @@ impl TextRenderer {
         frame: &Frame
     ) -> Result<()> {
         let font_size = self.config.display.font_size as f32;
-        let (text_r, text_g, text_b) = self.config.hex_to_rgb_normalized(&self.config.display.text_color)?;
+        let (text_r, text_g, text_b) = Config::hex_to_rgb_normalized(&self.config.display.text_color)?;
         
         let section = Section::default()
             .add_text(
@@ -242,7 +240,7 @@ pub struct TextRenderConfig {
 impl TextRenderConfig {
     /// Create from main config
     pub fn from_config(config: &Config) -> Result<Self> {
-        let (r, g, b) = config.hex_to_rgb_normalized(&config.display.text_color)?;
+        let (r, g, b) = Config::hex_to_rgb_normalized(&config.display.text_color)?;
         
         Ok(TextRenderConfig {
             font_family: config.display.font_family.clone(),

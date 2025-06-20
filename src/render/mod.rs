@@ -28,7 +28,7 @@ pub struct Renderer {
 
 impl Renderer {
     /// Create a new renderer
-    pub async fn new(config: Arc<Config>, surface: Option<&wgpu::Surface>) -> Result<Self> {
+    pub async fn new(config: Arc<Config>, surface: Option<&'static wgpu::Surface<'static>>) -> Result<Self> {
         // Initialize GPU renderer
         let gpu_renderer = GpuRenderer::new(Arc::clone(&config), surface).await?;
         
@@ -119,13 +119,6 @@ impl Renderer {
         self.gpu_renderer.resize(size.width, size.height).await?;
         self.text_renderer.resize(size.width, size.height).await?;
         
-        Ok(())
-    }
-    
-    /// Resize the renderer
-    pub async fn resize(&mut self, width: u32, height: u32) -> Result<()> {
-        self.gpu_renderer.resize(width, height).await?;
-        tracing::info!("Renderer resized to {}x{}", width, height);
         Ok(())
     }
     

@@ -14,7 +14,7 @@ pub struct GpuRenderer {
     adapter: Adapter,
     device: Device,
     queue: Queue,
-    surface: Option<Surface>,
+    surface: Option<Surface<'static>>,
     surface_config: Option<SurfaceConfiguration>,
     render_pipeline: RenderPipeline,
     current_frame: Option<SurfaceTexture>,
@@ -29,7 +29,7 @@ pub struct Frame {
 
 impl GpuRenderer {
     /// Create a new GPU renderer
-    pub async fn new(config: Arc<Config>, surface: Option<&wgpu::Surface>) -> Result<Self> {
+    pub async fn new(config: Arc<Config>, surface: Option<&'static wgpu::Surface<'static>>) -> Result<Self> {
         // Create wgpu instance
         let instance = Instance::new(InstanceDescriptor {
             backends: Backends::all(),
@@ -56,8 +56,8 @@ impl GpuRenderer {
             .request_device(
                 &DeviceDescriptor {
                     label: Some("wshowkeys_rs device"),
-                    features: Features::empty(),
-                    limits: Limits::default(),
+                    required_features: Features::empty(),
+                    required_limits: Limits::default(),
                 },
                 None,
             )
@@ -77,6 +77,7 @@ impl GpuRenderer {
                 present_mode: PresentMode::Fifo,
                 alpha_mode: CompositeAlphaMode::Auto,
                 view_formats: vec![],
+                desired_maximum_frame_latency: 2,
             };
             surf.configure(&device, &config);
             Some(config)
