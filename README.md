@@ -4,19 +4,21 @@ A minimal Rust implementation of wshowkeys - displays keystrokes on screen.
 
 ## MVP Features
 
-This is the Minimum Viable Product (MVP) version that includes:
+This project now includes both console and GUI implementations:
 
 - ✅ Global key input capture using `evdev` (supports multiple devices)
-- ✅ Console-based text rendering (MVP approach)
-- ✅ Real-time keystroke display with timing
-- ✅ Automatic cleanup of old keystrokes (3-second timeout)
+- ✅ **Console mode**: Real-time text rendering in terminal (default)
+- ✅ **GUI mode**: Transparent overlay window using `winit` (--gui flag)
+- ✅ Smart timeout: All keys disappear 3s after last keystroke
+- ✅ Always-on-top overlay window positioned at bottom-right
+- ✅ Automatic cleanup of old keystrokes
 
 ## Architecture
 
 - **Input handling**: Uses `evdev` to capture keystrokes from all keyboard devices
-- **Text rendering**: Console-based output for MVP (future: `wgpu` for on-screen display)
-- **Window management**: Planned to use `winit` for future GUI version
-- **Module structure**: Separated into `input`, `render`, and `app` modules
+- **Dual rendering**: Console output (default) or GUI overlay window (--gui)
+- **Window management**: Uses `eframe/egui` for cross-platform GUI overlay with native Wayland support
+- **Module structure**: Separated into `input`, `render`, `egui_render`, and `app` modules
 
 ## Requirements
 
@@ -30,13 +32,20 @@ This is the Minimum Viable Product (MVP) version that includes:
 cargo build --release
 ```
 
-2. Run with root privileges:
+2. Run in GUI overlay mode (default):
 ```bash
 sudo ./target/release/wshowkeys_rs
 ```
 
-3. Press keys to see them displayed in the console
-4. Press Ctrl+C to exit
+3. Run in console mode:
+```bash
+sudo ./target/release/wshowkeys_rs --console
+```
+
+The GUI mode creates a semi-transparent overlay window that displays keystrokes on top of other applications. The overlay uses native Wayland protocols and works well with modern Linux desktop environments like Hyprland.
+
+4. Press keys to see them displayed
+5. Press Ctrl+C to exit
 
 ## Development
 
@@ -52,11 +61,14 @@ sudo RUST_LOG=debug cargo run
 
 ## Future Roadmap
 
-- [ ] GUI window using `winit` and `wgpu`
+- [x] Console-based MVP ✅
+- [x] GUI overlay window with egui ✅  
+- [x] Native Wayland support for Hyprland ✅
 - [ ] Configurable display options
-- [ ] Multiple display modes
+- [ ] Multiple display modes  
 - [ ] Key combination detection
 - [ ] Customizable themes
+- [ ] Window positioning options
 
 ## License
 
