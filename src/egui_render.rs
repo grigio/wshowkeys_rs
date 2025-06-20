@@ -133,7 +133,9 @@ impl eframe::App for KeyDisplayApp {
 
         // Create a fully transparent overlay with no background whatsoever
         egui::CentralPanel::default()
-            .frame(egui::Frame::none())
+            .frame(
+                egui::Frame::none().inner_margin(egui::Margin::symmetric(2.0, 2.0)), // Add inner margin to the panel
+            )
             .show(ctx, |ui| {
                 // Set the UI background to transparent
                 ui.style_mut().visuals.window_fill = egui::Color32::TRANSPARENT;
@@ -145,7 +147,9 @@ impl eframe::App for KeyDisplayApp {
                 if let Ok(keys) = self.displayed_keys.try_lock() {
                     if !keys.is_empty() {
                         ui.horizontal_wrapped(|ui| {
-                            ui.spacing_mut().item_spacing.x = 8.0; // Space between keys
+                            ui.spacing_mut().item_spacing.x = 5.0; // More space between keys
+                            ui.spacing_mut().item_spacing.y = 2.0; // Vertical spacing for wrapped keys
+                            ui.spacing_mut().button_padding = egui::Vec2::new(2.0, 1.0); // Inner padding for buttons
 
                             for (i, key) in keys.iter().enumerate() {
                                 // Age-based opacity and styling
@@ -155,69 +159,87 @@ impl eframe::App for KeyDisplayApp {
                                 .max(0.0);
 
                                 // Different colors and effects based on age and position
-                                let (bg_color, text_color, size) = if i == keys.len() - 1 {
+                                let (bg_color, text_color, size, is_recent) = if i == keys.len() - 1
+                                {
                                     // Most recent key - bright and large
                                     (
                                         egui::Color32::from_rgba_unmultiplied(
-                                            100,
+                                            70,
+                                            130,
                                             200,
-                                            255,
-                                            (200.0 * age_factor) as u8,
-                                        ),
-                                        egui::Color32::WHITE,
-                                        18.0,
-                                    )
-                                } else {
-                                    // Older keys - gradually fade
-                                    (
-                                        egui::Color32::from_rgba_unmultiplied(
-                                            80,
-                                            160,
-                                            220,
-                                            (150.0 * age_factor) as u8,
-                                        ),
-                                        egui::Color32::from_rgba_unmultiplied(
-                                            255,
-                                            255,
-                                            255,
                                             (220.0 * age_factor) as u8,
                                         ),
-                                        14.0,
+                                        egui::Color32::WHITE,
+                                        16.0,
+                                        true,
+                                    )
+                                } else {
+                                    // Older keys - gradually fade with different colors
+                                    (
+                                        egui::Color32::from_rgba_unmultiplied(
+                                            50,
+                                            90,
+                                            150,
+                                            (160.0 * age_factor) as u8,
+                                        ),
+                                        egui::Color32::from_rgba_unmultiplied(
+                                            220,
+                                            220,
+                                            220,
+                                            (200.0 * age_factor) as u8,
+                                        ),
+                                        13.0,
+                                        false,
                                     )
                                 };
 
                                 // Create a styled button-like appearance for each key
+                                let key_text = if key.text.len() == 1
+                                    && key
+                                        .text
+                                        .chars()
+                                        .all(|c| c.is_alphabetic() || c.is_numeric())
+                                {
+                                    // Single letters/numbers - make them larger and bold
+                                    egui::RichText::new(&key.text)
+                                        .size(size + 2.0)
+                                        .color(text_color)
+                                        .strong()
+                                } else {
+                                    // Special keys and combinations - use smaller font
+                                    egui::RichText::new(&key.text)
+                                        .size(size - 2.0)
+                                        .color(text_color)
+                                        .strong()
+                                };
+
                                 let key_response = ui.add(
-                                    egui::Button::new(
-                                        egui::RichText::new(&key.text)
-                                            .size(size)
-                                            .color(text_color)
-                                            .strong(),
-                                    )
-                                    .fill(bg_color)
-                                    .rounding(egui::Rounding::same(6.0))
-                                    .stroke(egui::Stroke::new(
-                                        1.0,
-                                        egui::Color32::from_rgba_unmultiplied(
-                                            255,
-                                            255,
-                                            255,
-                                            (100.0 * age_factor) as u8,
-                                        ),
-                                    )),
+                                    egui::Button::new(key_text)
+                                        .fill(bg_color)
+                                        .rounding(egui::Rounding::same(2.0))
+                                        .stroke(egui::Stroke::new(
+                                            1.5,
+                                            egui::Color32::from_rgba_unmultiplied(
+                                                255,
+                                                255,
+                                                255,
+                                                (120.0 * age_factor) as u8,
+                                            ),
+                                        ))
+                                        .min_size(egui::Vec2::new(32.0, 24.0)),
                                 );
 
                                 // Add a subtle glow effect for the most recent key
-                                if i == keys.len() - 1 && age.as_millis() < 500 {
-                                    let glow_rect = key_response.rect.expand(2.0);
+                                if is_recent && age.as_millis() < 500 {
+                                    let glow_rect = key_response.rect.expand(3.0);
                                     ui.painter().rect(
                                         glow_rect,
-                                        egui::Rounding::same(8.0),
+                                        egui::Rounding::same(10.0),
                                         egui::Color32::TRANSPARENT,
                                         egui::Stroke::new(
-                                            2.0,
+                                            2.5,
                                             egui::Color32::from_rgba_unmultiplied(
-                                                100, 200, 255, 100,
+                                                70, 130, 255, 150,
                                             ),
                                         ),
                                     );

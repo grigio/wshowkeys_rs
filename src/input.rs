@@ -165,6 +165,7 @@ impl InputHandler {
 
     fn format_key_name(key: Key) -> String {
         match key {
+            // Letters - keep simple
             Key::KEY_A => "A".to_string(),
             Key::KEY_B => "B".to_string(),
             Key::KEY_C => "C".to_string(),
@@ -191,6 +192,8 @@ impl InputHandler {
             Key::KEY_X => "X".to_string(),
             Key::KEY_Y => "Y".to_string(),
             Key::KEY_Z => "Z".to_string(),
+
+            // Numbers - keep simple
             Key::KEY_0 => "0".to_string(),
             Key::KEY_1 => "1".to_string(),
             Key::KEY_2 => "2".to_string(),
@@ -201,10 +204,51 @@ impl InputHandler {
             Key::KEY_7 => "7".to_string(),
             Key::KEY_8 => "8".to_string(),
             Key::KEY_9 => "9".to_string(),
+
+            // Special keys with simple text labels (guaranteed egui support)
             Key::KEY_SPACE => "SPACE".to_string(),
             Key::KEY_ENTER => "ENTER".to_string(),
-            Key::KEY_BACKSPACE => "BACKSPACE".to_string(),
+            Key::KEY_BACKSPACE => "BKSP".to_string(),
             Key::KEY_TAB => "TAB".to_string(),
+            Key::KEY_ESC => "ESC".to_string(),
+            Key::KEY_DELETE => "DEL".to_string(),
+            Key::KEY_HOME => "HOME".to_string(),
+            Key::KEY_END => "END".to_string(),
+            Key::KEY_PAGEUP => "PGUP".to_string(),
+            Key::KEY_PAGEDOWN => "PGDN".to_string(),
+            Key::KEY_UP => "UP".to_string(),
+            Key::KEY_DOWN => "DOWN".to_string(),
+            Key::KEY_LEFT => "LEFT".to_string(),
+            Key::KEY_RIGHT => "RIGHT".to_string(),
+
+            // Function keys
+            Key::KEY_F1 => "F1".to_string(),
+            Key::KEY_F2 => "F2".to_string(),
+            Key::KEY_F3 => "F3".to_string(),
+            Key::KEY_F4 => "F4".to_string(),
+            Key::KEY_F5 => "F5".to_string(),
+            Key::KEY_F6 => "F6".to_string(),
+            Key::KEY_F7 => "F7".to_string(),
+            Key::KEY_F8 => "F8".to_string(),
+            Key::KEY_F9 => "F9".to_string(),
+            Key::KEY_F10 => "F10".to_string(),
+            Key::KEY_F11 => "F11".to_string(),
+            Key::KEY_F12 => "F12".to_string(),
+
+            // Common punctuation and symbols
+            Key::KEY_COMMA => ",".to_string(),
+            Key::KEY_DOT => ".".to_string(),
+            Key::KEY_SLASH => "/".to_string(),
+            Key::KEY_SEMICOLON => ";".to_string(),
+            Key::KEY_APOSTROPHE => "'".to_string(),
+            Key::KEY_LEFTBRACE => "[".to_string(),
+            Key::KEY_RIGHTBRACE => "]".to_string(),
+            Key::KEY_BACKSLASH => "\\".to_string(),
+            Key::KEY_MINUS => "-".to_string(),
+            Key::KEY_EQUAL => "=".to_string(),
+            Key::KEY_GRAVE => "`".to_string(),
+
+            // Modifier keys (shorter for combinations)
             Key::KEY_LEFTSHIFT => "SHIFT".to_string(),
             Key::KEY_RIGHTSHIFT => "SHIFT".to_string(),
             Key::KEY_LEFTCTRL => "CTRL".to_string(),
@@ -213,7 +257,7 @@ impl InputHandler {
             Key::KEY_RIGHTALT => "ALT".to_string(),
             Key::KEY_LEFTMETA => "META".to_string(),
             Key::KEY_RIGHTMETA => "META".to_string(),
-            Key::KEY_ESC => "ESC".to_string(),
+
             _ => format!("{:?}", key),
         }
     }
