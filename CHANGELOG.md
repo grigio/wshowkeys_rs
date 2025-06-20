@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.0] - 2025-06-20
+
+### Added
+- **Enhanced Visual Design**: Improved button styling with proper padding and spacing
+- **Comprehensive Key Support**: Added function keys (F1-F12) and punctuation symbols
+- **Better Layout**: Optimized spacing between keys and panel margins
+- **Minimum Button Size**: Consistent 32x24px buttons for better readability
+
+### Changed
+- **Text Rendering**: Switched from Unicode symbols to plain text for guaranteed egui compatibility
+- **Button Appearance**: Reduced corner rounding to 2px for cleaner look
+- **Spacing Optimization**: Fine-tuned margins and padding for professional appearance
+- **Font Sizing**: Adaptive text sizing for single characters vs. key combinations
+
+### Fixed
+- **Unicode Display Issues**: Replaced problematic emoji/Unicode symbols with reliable text labels
+- **Button Padding**: Added proper inner margins for text within buttons
+- **Layout Consistency**: Improved spacing between keys and wrapped rows
+
 ## [1.2.0] - 2025-06-20
 
 ### Added
