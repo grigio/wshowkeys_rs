@@ -1,7 +1,7 @@
-//! wshowkeys_rs - A Rust implementation of wshowkeys for Wayland
+//! wshowkeys_rs - A Rust implementation of wshowkeys for Linux
 //!
 //! This application displays keystrokes on screen for screencasting and presentations.
-//! It uses GPU-accelerated rendering with wgpu and integrates with Wayland compositors.
+//! It uses GPU-accelerated rendering with wgpu and global input capture via evdev.
 
 use anyhow::Result;
 use clap::Parser;
@@ -25,7 +25,7 @@ use render::Renderer;
 /// Command line arguments
 #[derive(Parser, Clone)]
 #[command(name = "wshowkeys_rs")]
-#[command(about = "A Rust implementation of wshowkeys - displays keystrokes on screen for Wayland")]
+#[command(about = "A Rust implementation of wshowkeys - displays keystrokes on screen for Linux")]
 #[command(version)]
 struct Args {
     /// Configuration file path
