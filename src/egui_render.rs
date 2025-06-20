@@ -1,7 +1,7 @@
 use anyhow::Result;
 use eframe::egui;
 use log::info;
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -14,6 +14,7 @@ const KEY_DISPLAY_DURATION: Duration = Duration::from_secs(3);
 pub struct EguiGuiRenderer {
     displayed_keys: Arc<Mutex<VecDeque<DisplayedKey>>>,
     last_key_time: Arc<Mutex<Option<Instant>>>,
+    active_modifiers: Arc<Mutex<HashSet<String>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +28,7 @@ impl EguiGuiRenderer {
         Self {
             displayed_keys: Arc::new(Mutex::new(VecDeque::new())),
             last_key_time: Arc::new(Mutex::new(None)),
+            active_modifiers: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -55,6 +57,7 @@ impl EguiGuiRenderer {
         let app = KeyDisplayApp {
             displayed_keys: Arc::clone(&self.displayed_keys),
             last_key_time: Arc::clone(&self.last_key_time),
+            active_modifiers: Arc::clone(&self.active_modifiers),
             key_receiver: Some(key_receiver),
         };
 
@@ -69,6 +72,7 @@ impl EguiGuiRenderer {
 struct KeyDisplayApp {
     displayed_keys: Arc<Mutex<VecDeque<DisplayedKey>>>,
     last_key_time: Arc<Mutex<Option<Instant>>>,
+    active_modifiers: Arc<Mutex<HashSet<String>>>,
     key_receiver: Option<UnboundedReceiver<KeyEvent>>,
 }
 
@@ -86,17 +90,41 @@ impl eframe::App for KeyDisplayApp {
 
         // Process key events from the channel
         let mut new_events = Vec::new();
+        let mut modifier_updates = Vec::new();
+
         if let Some(ref mut receiver) = self.key_receiver {
             while let Ok(key_event) = receiver.try_recv() {
                 info!("Received key event: {:?}", key_event);
-                if key_event.pressed {
+
+                if key_event.is_modifier {
+                    // Store modifier updates for later processing
+                    modifier_updates.push((key_event.key.clone(), key_event.pressed));
+                } else if key_event.pressed {
+                    // Store the key for combination creation
                     new_events.push(key_event.key);
                 }
             }
         }
 
-        // Add the new events
-        for key in new_events {
+        // Update modifier state
+        if let Ok(mut modifiers) = self.active_modifiers.try_lock() {
+            for (modifier_key, pressed) in modifier_updates {
+                if pressed {
+                    modifiers.insert(modifier_key);
+                } else {
+                    modifiers.remove(&modifier_key);
+                }
+            }
+        }
+
+        // Create key combinations for regular keys
+        let combined_events: Vec<String> = new_events
+            .into_iter()
+            .map(|key| self.create_key_combination(&key))
+            .collect();
+
+        // Add the combined events
+        for key in combined_events {
             self.add_key_display(key);
         }
 
@@ -206,6 +234,25 @@ impl eframe::App for KeyDisplayApp {
 }
 
 impl KeyDisplayApp {
+    fn create_key_combination(&self, base_key: &str) -> String {
+        if let Ok(modifiers) = self.active_modifiers.try_lock() {
+            if modifiers.is_empty() {
+                base_key.to_string()
+            } else {
+                // Sort modifiers for consistent display order
+                let mut sorted_modifiers: Vec<String> = modifiers.iter().cloned().collect();
+                sorted_modifiers.sort();
+
+                let mut combination = sorted_modifiers.join("+");
+                combination.push('+');
+                combination.push_str(base_key);
+                combination
+            }
+        } else {
+            base_key.to_string()
+        }
+    }
+
     fn add_key_display(&mut self, key: String) {
         info!("Adding key display to eframe GUI: {}", key);
 

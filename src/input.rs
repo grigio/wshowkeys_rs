@@ -10,6 +10,7 @@ pub struct KeyEvent {
     pub key: String,
     pub pressed: bool,
     pub timestamp: std::time::Instant,
+    pub is_modifier: bool,
 }
 
 pub struct InputHandler {
@@ -122,11 +123,13 @@ impl InputHandler {
                             let key = Key::new(event.code());
                             let key_name = Self::format_key_name(key);
                             let pressed = event.value() == 1; // 1 = pressed, 0 = released
+                            let is_modifier = Self::is_modifier_key(key);
 
                             let key_event = KeyEvent {
                                 key: key_name,
                                 pressed,
                                 timestamp: std::time::Instant::now(),
+                                is_modifier,
                             };
 
                             debug!("Key event: {:?}", key_event);
@@ -144,6 +147,20 @@ impl InputHandler {
                 }
             }
         }
+    }
+
+    fn is_modifier_key(key: Key) -> bool {
+        matches!(
+            key,
+            Key::KEY_LEFTSHIFT
+                | Key::KEY_RIGHTSHIFT
+                | Key::KEY_LEFTCTRL
+                | Key::KEY_RIGHTCTRL
+                | Key::KEY_LEFTALT
+                | Key::KEY_RIGHTALT
+                | Key::KEY_LEFTMETA
+                | Key::KEY_RIGHTMETA
+        )
     }
 
     fn format_key_name(key: Key) -> String {
@@ -194,6 +211,8 @@ impl InputHandler {
             Key::KEY_RIGHTCTRL => "CTRL".to_string(),
             Key::KEY_LEFTALT => "ALT".to_string(),
             Key::KEY_RIGHTALT => "ALT".to_string(),
+            Key::KEY_LEFTMETA => "META".to_string(),
+            Key::KEY_RIGHTMETA => "META".to_string(),
             Key::KEY_ESC => "ESC".to_string(),
             _ => format!("{:?}", key),
         }
