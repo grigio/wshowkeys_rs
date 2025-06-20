@@ -12,17 +12,17 @@ categories = ["multimedia", "gui"]
 name = "wshowkeys_rs"
 path = "src/main.rs"
 
-[[bin]]
-name = "wshowkeys_rs_simple"
-path = "src/main_simple.rs"
+# [[bin]]
+# name = "wshowkeys_rs_simple"
+# path = "src/main_simple.rs"
 
-[[bin]]
-name = "wshowkeys_rs_wayland_test"
-path = "src/main_wayland_test.rs"
+# [[bin]]
+# name = "wshowkeys_rs_wayland_test"
+# path = "src/main_wayland_test.rs"
 
-[[bin]]
-name = "wshowkeys_rs_input_test"
-path = "src/main_input_test.rs"
+# [[bin]]
+# name = "wshowkeys_rs_input_test"
+# path = "src/main_input_test.rs"
 
 [dependencies]
 # Async runtime
@@ -69,3 +69,10 @@ raw-window-handle = "0.6"
 
 # Event handling
 crossbeam-channel = "0.5"
+
+# Image processing (for tests)
+image = "0.24"
+
+# Wayland support
+wayland-client = "0.31"
+wayland-protocols = { version = "0.31", features = ["client"] }

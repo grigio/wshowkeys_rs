@@ -1,1 +1,13 @@
 /target
+
+# Temporary files and render output
+/temp/
+*.png
+*.jpg
+*.jpeg
+
+# Test outputs (keep examples but ignore generated files)
+test_*.png
+render_*.png
+*_test.png
+*_output.png

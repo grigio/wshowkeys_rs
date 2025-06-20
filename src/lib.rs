@@ -9,6 +9,13 @@ pub mod input {
     pub mod parser;
 }
 
+// Note: Display module requires Wayland dependencies for full functionality
+// Commenting out for basic testing without Wayland dependencies
+// pub mod display;
+
+// Render module (may have compilation issues due to GPU dependencies)
+// pub mod render;
+
 /// Simple Args struct for library usage
 #[derive(Clone)]
 pub struct Args {

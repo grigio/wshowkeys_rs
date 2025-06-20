@@ -1,7 +1,7 @@
 //! Input capture module for keyboard and mouse events
 
 pub mod evdev;
-pub mod hyprland;
+// pub mod hyprland;  // Commented out - file not found
 pub mod parser;
 
 use anyhow::Result;
@@ -57,6 +57,8 @@ impl InputManager {
         }
 
         // Start Hyprland IPC capture (if available)
+        // TODO: Re-enable when hyprland module is implemented
+        /*
         if hyprland::is_hyprland_available().await {
             let hyprland_bus = Arc::clone(&self.event_bus);
             let hyprland_running = Arc::clone(&self.is_running);
@@ -67,6 +69,7 @@ impl InputManager {
                     .await
             }));
         }
+        */
         // Wait for tasks to complete (they should run indefinitely)
         if let Some(evdev_handle) = self.evdev_handle.take() {
             let _ = evdev_handle.await;
