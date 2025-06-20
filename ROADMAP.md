@@ -1,106 +1,83 @@
 # wshowkeys_rs Development Roadmap
 
-A Rust-based Wayland keystroke display application.
+A minimal Rust implementation of wshowkeys - displays keystrokes on screen for Wayland.
 
-## Project Overview
+## Project Goals
 
-wshowkeys_rs displays keystrokes on screen in real-time using Wayland. Simple modular architecture for maintainability.
-
-## Architecture
-
-```
-wshowkeys_rs/
-├── src/
-│   ├── config.rs      # Configuration and CLI args
-│   ├── input.rs       # Wayland input handling
-│   ├── display.rs     # Wayland display and window
-│   ├── render.rs      # Cairo text rendering
-│   └── main.rs        # Application entry point
-└── Cargo.toml
-```
+- 🎯 **Simple**: Easy to build and use
+- ⚡ **Fast**: Low latency keystroke display
+- 🔧 **Configurable**: Basic customization options
+- 📦 **Minimal**: Few dependencies, small binary
 
 ## Development Phases
 
-### Phase 1: Core Foundation
-**Goal**: Basic keystroke capture and display
+### Phase 1: MVP (Minimum Viable Product)
+**Goal**: Basic keystroke display working
 
-**Tasks**:
-- [ ] Set up Wayland connection and input capture
-- [ ] Implement basic text rendering with Cairo
-- [ ] Create overlay window with transparency
-- [ ] Add CLI argument parsing and basic config
+#### 1.1 Project Setup ✅
+- [x] Create Cargo project structure
+- [x] Add basic dependencies
 
-**Key Features**:
-- [ ] Real-time keystroke display
-- [ ] Basic window positioning
-- [ ] Simple configuration
+#### 1.2 Core Foundation
+- [ ] `main.rs` - Basic app structure and CLI args
+- [ ] `input.rs` - Wayland keyboard input capture
+- [ ] `display.rs` - Simple text overlay window
 
-### Phase 2: Enhanced Features
-**Goal**: Polish and advanced functionality
+**Target**: Display "Hello World" on screen when any key is pressed
 
-**Tasks**:
-- [ ] Special key mapping (arrows, modifiers, function keys)
-- [ ] Key combination detection and repeat counting
-- [ ] Timeout-based keystroke clearing
-- [ ] Customizable themes and positioning
+### Phase 2: Basic Functionality
+**Goal**: Show actual keystrokes
 
-**Key Features**:
-- [ ] Smart key name display
-- [ ] Combination key grouping
-- [ ] Auto-clear old keystrokes
-- [ ] Theme customization
+#### 2.1 Key Processing
+- [ ] Map keycodes to readable names
+- [ ] Handle special keys (Space, Enter, arrows, etc.)
+- [ ] Basic modifier detection (Ctrl, Alt, Shift)
 
-### Phase 3: Multi-Output & Polish
-**Goal**: Production-ready application
+#### 2.2 Display Improvements
+- [ ] Show key names instead of codes
+- [ ] Basic styling (font, size)
+- [ ] Position on screen (corner/center)
 
-**Tasks**:
-- [ ] Multi-monitor support
-- [ ] Performance optimization
-- [ ] Runtime configuration changes
-- [ ] Documentation and packaging
+**Target**: See "a", "Space", "Ctrl+c" when typing
 
-**Key Features**:
-- [ ] Multi-output display
-- [ ] Low resource usage
-- [ ] Hot configuration reload
-- [ ] Package distribution
+### Phase 3: Polish
+**Goal**: User-friendly features
 
-## Core Dependencies
+#### 3.1 Configuration
+- [ ] `config.rs` - Read config from file/CLI
+- [ ] Customizable colors and fonts
+- [ ] Position and size options
 
-```toml
-[dependencies]
-# Error handling
-anyhow = "1.0"
-thiserror = "1.0"
+#### 3.2 Advanced Features
+- [ ] Key combination counting ("aaa" → "a×3")
+- [ ] Timeout-based clearing
+- [ ] Multiple monitor support
 
-# CLI and config
-clap = { version = "4.0", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+**Target**: Production-ready keystroke display tool
 
-# Async runtime
-tokio = { version = "1.0", features = ["macros", "rt", "time"] }
+## Architecture (Simplified)
 
-# Wayland
-wayland-client = "0.31"
-wayland-protocols = "0.31"
-xkbcommon = "0.7"
-
-# Rendering
-cairo-rs = "0.18"
-pango = "0.18"
+```
+src/
+├── main.rs        # Entry point, CLI parsing
+├── input.rs       # Wayland input handling
+├── display.rs     # Window management & rendering
+└── config.rs      # Configuration (Phase 3)
 ```
 
-## Code Guidelines
+## Dependencies Strategy
 
-- [ ] Use `anyhow::Result<T>` for error handling
-- [ ] Implement async with `tokio` for timers and events
-- [ ] Keep modules simple and focused
-- [ ] Use proper Rust documentation
-- [ ] Handle errors gracefully with user-friendly messages
+**Start minimal, add as needed:**
+- Phase 1: `wayland-client`, `clap` (CLI)
+- Phase 2: Font rendering crate
+- Phase 3: Config parsing (`serde`, `toml`)
 
-## Success Criteria
+## Getting Started
 
-- [ ] **Phase 1**: Basic keystroke display working
-- [ ] **Phase 2**: Special keys and combinations work
-- [ ] **Phase 3**: Multi-monitor support and optimized performance
+1. **First run Phase 1.2** - Get a window showing on screen
+2. **Then Phase 2.1** - Capture and display one keystroke  
+3. **Iterate quickly** - Small working increments
+
+---
+
+*Keep it simple, make it work, then make it better.*
