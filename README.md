@@ -34,15 +34,17 @@ cargo build --release
 
 2. Run in GUI overlay mode (default):
 ```bash
-sudo ./target/release/wshowkeys_rs
+./target/release/wshowkeys_rs
 ```
 
 3. Run in console mode:
 ```bash
-sudo ./target/release/wshowkeys_rs --console
+./target/release/wshowkeys_rs --console
 ```
 
 The GUI mode creates a semi-transparent overlay window that displays keystrokes on top of other applications. The overlay uses native Wayland protocols and works well with modern Linux desktop environments like Hyprland.
+
+**Note**: No sudo required! The application works with standard user permissions on modern Linux systems where your user has access to input devices (typically via the `input` group).
 
 4. Press keys to see them displayed
 5. Press Ctrl+C to exit
