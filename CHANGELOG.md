@@ -16,4 +16,4 @@
 - N/A (initial release)
 
 ### Fixed
-- N/A (initial release)
+- Fixed timeout logic to clear all keys 3s after last keystroke (was clearing individual keys)
