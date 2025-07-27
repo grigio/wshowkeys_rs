@@ -9,7 +9,6 @@ use tokio::task;
 pub struct KeyEvent {
     pub key: String,
     pub pressed: bool,
-    pub timestamp: std::time::Instant,
     pub is_modifier: bool,
 }
 
@@ -128,7 +127,6 @@ impl InputHandler {
                             let key_event = KeyEvent {
                                 key: key_name,
                                 pressed,
-                                timestamp: std::time::Instant::now(),
                                 is_modifier,
                             };
 

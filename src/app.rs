@@ -14,7 +14,6 @@ pub enum RenderMode {
 
 pub struct App {
     key_sender: UnboundedSender<KeyEvent>,
-    key_receiver: Option<UnboundedReceiver<KeyEvent>>,
     render_mode: RenderMode,
     console_renderer: Option<Renderer>,
     egui_renderer: Option<EguiGuiRenderer>,
@@ -34,14 +33,13 @@ impl App {
             }
         );
 
-        let (console_renderer, egui_renderer, stored_receiver) = match mode {
-            RenderMode::Console => (Some(Renderer::new(key_receiver)), None, None),
-            RenderMode::Gui => (None, Some(EguiGuiRenderer::new()), Some(key_receiver)),
+        let (console_renderer, egui_renderer) = match mode {
+            RenderMode::Console => (Some(Renderer::new(key_receiver)), None),
+            RenderMode::Gui => (None, Some(EguiGuiRenderer::new())),
         };
 
         Ok(Self {
             key_sender,
-            key_receiver: stored_receiver,
             render_mode: mode,
             console_renderer,
             egui_renderer,

@@ -18,7 +18,6 @@ pub struct Renderer {
 #[derive(Debug)]
 struct DisplayedKey {
     text: String,
-    timestamp: Instant,
 }
 
 impl Renderer {
@@ -66,10 +65,7 @@ impl Renderer {
         let now = Instant::now();
         self.last_key_time = Some(now);
 
-        self.displayed_keys.push_back(DisplayedKey {
-            text: key,
-            timestamp: now,
-        });
+        self.displayed_keys.push_back(DisplayedKey { text: key });
 
         // Limit the number of displayed keys
         while self.displayed_keys.len() > MAX_DISPLAYED_KEYS {
